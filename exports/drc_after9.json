@@ -1,0 +1,449 @@
+{
+    "$schema": "https://schemas.kicad.org/drc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-09-12T08:58:35+0000",
+    "kicad_version": "9.0.2",
+    "schematic_parity": [],
+    "source": "PinaBiosensor_Mini.kicad_pcb",
+    "unconnected_items": [
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "068d488b-dae9-4287-92e7-728976323415"
+                },
+                {
+                    "description": "Zone [GNDD] on B.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "e7040690-8fa2-4b6e-a184-d213bfec9f6b"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "068d488b-dae9-4287-92e7-728976323415"
+                },
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "068d488b-dae9-4287-92e7-728976323415"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c032c55e-dd52-4930-bf74-876b38f1d2a7"
+                },
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c032c55e-dd52-4930-bf74-876b38f1d2a7"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c032c55e-dd52-4930-bf74-876b38f1d2a7"
+                },
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c032c55e-dd52-4930-bf74-876b38f1d2a7"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDA] on B.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "84068b2d-4e8e-4fcc-af02-4e9ddf4d6085"
+                },
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c032c55e-dd52-4930-bf74-876b38f1d2a7"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        }
+    ],
+    "violations": [
+        {
+            "description": "Tracks crossing",
+            "items": [
+                {
+                    "description": "Track [GSR_AIN] on F.Cu, length 1.2254 mm",
+                    "pos": {
+                        "x": 97.0,
+                        "y": 20.15
+                    },
+                    "uuid": "aacf3e31-b5f3-46e5-bdba-8604ea00b4f4"
+                },
+                {
+                    "description": "Track [GNDA] on F.Cu, length 1.4750 mm",
+                    "pos": {
+                        "x": 96.0,
+                        "y": 20.15
+                    },
+                    "uuid": "f21253ca-a9c4-4688-826b-552266c9f271"
+                }
+            ],
+            "severity": "error",
+            "type": "tracks_crossing"
+        },
+        {
+            "description": "Items shorting two nets (nets GNDA and ADS_ALERT)",
+            "items": [
+                {
+                    "description": "Track [GNDA] on F.Cu, length 7.8500 mm",
+                    "pos": {
+                        "x": 97.475,
+                        "y": 20.15
+                    },
+                    "uuid": "7bddafbd-cc74-44c1-8d82-19e17c2af68b"
+                },
+                {
+                    "description": "Track [ADS_ALERT] on F.Cu, length 1.1613 mm",
+                    "pos": {
+                        "x": 97.6561,
+                        "y": 19.7398
+                    },
+                    "uuid": "9ef931de-4c18-4042-9962-a1645e79d33b"
+                }
+            ],
+            "severity": "error",
+            "type": "shorting_items"
+        },
+        {
+            "description": "Items shorting two nets (nets GNDA and ADS_ALERT)",
+            "items": [
+                {
+                    "description": "Track [GNDA] on F.Cu, length 7.8500 mm",
+                    "pos": {
+                        "x": 97.475,
+                        "y": 20.15
+                    },
+                    "uuid": "7bddafbd-cc74-44c1-8d82-19e17c2af68b"
+                },
+                {
+                    "description": "Via [ADS_ALERT] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 97.6561,
+                        "y": 20.9011
+                    },
+                    "uuid": "ae4c5378-5569-4418-a2d6-8dfb2d0f0b49"
+                }
+            ],
+            "severity": "error",
+            "type": "shorting_items"
+        },
+        {
+            "description": "Items shorting two nets (nets ADS_ALERT and GNDA)",
+            "items": [
+                {
+                    "description": "Track [ADS_ALERT] on F.Cu, length 1.1613 mm",
+                    "pos": {
+                        "x": 97.6561,
+                        "y": 19.7398
+                    },
+                    "uuid": "9ef931de-4c18-4042-9962-a1645e79d33b"
+                },
+                {
+                    "description": "Track [GNDA] on F.Cu, length 1.4750 mm",
+                    "pos": {
+                        "x": 96.0,
+                        "y": 20.15
+                    },
+                    "uuid": "f21253ca-a9c4-4688-826b-552266c9f271"
+                }
+            ],
+            "severity": "error",
+            "type": "shorting_items"
+        },
+        {
+            "description": "Tracks crossing",
+            "items": [
+                {
+                    "description": "Track [ECG_AIN] on F.Cu, length 0.5663 mm",
+                    "pos": {
+                        "x": 96.5,
+                        "y": 20.15
+                    },
+                    "uuid": "362ce1ae-6cd3-4862-8c32-10e13081fbec"
+                },
+                {
+                    "description": "Track [GNDA] on F.Cu, length 1.4750 mm",
+                    "pos": {
+                        "x": 96.0,
+                        "y": 20.15
+                    },
+                    "uuid": "f21253ca-a9c4-4688-826b-552266c9f271"
+                }
+            ],
+            "severity": "error",
+            "type": "tracks_crossing"
+        },
+        {
+            "description": "Clearance violation (zone clearance 0.3000 mm; actual 0.0000 mm)",
+            "items": [
+                {
+                    "description": "Via [+3V3] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 30.0,
+                        "y": 45.0
+                    },
+                    "uuid": "3f12c220-7caf-4c80-b517-b0600c3cac9f"
+                },
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "068d488b-dae9-4287-92e7-728976323415"
+                }
+            ],
+            "severity": "error",
+            "type": "clearance"
+        },
+        {
+            "description": "Clearance violation (zone clearance 0.3000 mm; actual 0.1255 mm)",
+            "items": [
+                {
+                    "description": "Via [VBAT_DIV] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 40.0,
+                        "y": 20.0
+                    },
+                    "uuid": "e9fee07c-5007-4e41-8e95-2017a8fff204"
+                },
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "068d488b-dae9-4287-92e7-728976323415"
+                }
+            ],
+            "severity": "error",
+            "type": "clearance"
+        },
+        {
+            "description": "Clearance violation (zone clearance 0.3000 mm; actual 0.0000 mm)",
+            "items": [
+                {
+                    "description": "Via [VBAT_DIV] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 40.0,
+                        "y": 20.0
+                    },
+                    "uuid": "e9fee07c-5007-4e41-8e95-2017a8fff204"
+                },
+                {
+                    "description": "Zone [GNDD] on B.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "e7040690-8fa2-4b6e-a184-d213bfec9f6b"
+                }
+            ],
+            "severity": "error",
+            "type": "clearance"
+        },
+        {
+            "description": "Clearance violation (zone clearance 0.3000 mm; actual 0.0000 mm)",
+            "items": [
+                {
+                    "description": "Via [+3V3] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 30.0,
+                        "y": 45.0
+                    },
+                    "uuid": "3f12c220-7caf-4c80-b517-b0600c3cac9f"
+                },
+                {
+                    "description": "Zone [GNDD] on B.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "e7040690-8fa2-4b6e-a184-d213bfec9f6b"
+                }
+            ],
+            "severity": "error",
+            "type": "clearance"
+        },
+        {
+            "description": "Clearance violation (zone clearance 0.3000 mm; actual 0.2255 mm)",
+            "items": [
+                {
+                    "description": "Via [V_BATT] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 20.0,
+                        "y": 30.0
+                    },
+                    "uuid": "375cdaaa-e57c-49d3-bea5-a6ad0dbe0156"
+                },
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "068d488b-dae9-4287-92e7-728976323415"
+                }
+            ],
+            "severity": "error",
+            "type": "clearance"
+        },
+        {
+            "description": "Clearance violation (zone clearance 0.3000 mm; actual 0.0000 mm)",
+            "items": [
+                {
+                    "description": "Via [V_BATT] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 20.0,
+                        "y": 30.0
+                    },
+                    "uuid": "375cdaaa-e57c-49d3-bea5-a6ad0dbe0156"
+                },
+                {
+                    "description": "Zone [GNDD] on B.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "e7040690-8fa2-4b6e-a184-d213bfec9f6b"
+                }
+            ],
+            "severity": "error",
+            "type": "clearance"
+        },
+        {
+            "description": "Front solder mask aperture bridges items with different nets",
+            "items": [
+                {
+                    "description": "Track [GNDA] on F.Cu, length 1.4750 mm",
+                    "pos": {
+                        "x": 96.0,
+                        "y": 20.15
+                    },
+                    "uuid": "f21253ca-a9c4-4688-826b-552266c9f271"
+                },
+                {
+                    "description": "Pad 4 [ECG_AIN] of U4 on F.Cu",
+                    "pos": {
+                        "x": 96.5,
+                        "y": 20.15
+                    },
+                    "uuid": "fef050a7-a777-4478-a2e7-ff2850fb039b"
+                }
+            ],
+            "severity": "error",
+            "type": "solder_mask_bridge"
+        },
+        {
+            "description": "Front solder mask aperture bridges items with different nets",
+            "items": [
+                {
+                    "description": "Track [GNDA] on F.Cu, length 1.4750 mm",
+                    "pos": {
+                        "x": 96.0,
+                        "y": 20.15
+                    },
+                    "uuid": "f21253ca-a9c4-4688-826b-552266c9f271"
+                },
+                {
+                    "description": "Pad 5 [GSR_AIN] of U4 on F.Cu",
+                    "pos": {
+                        "x": 97.0,
+                        "y": 20.15
+                    },
+                    "uuid": "a966067e-4df1-49e2-ad55-0281309d5712"
+                }
+            ],
+            "severity": "error",
+            "type": "solder_mask_bridge"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J7 ABD' on F.Silkscreen",
+                    "pos": {
+                        "x": 98.0,
+                        "y": 55.0
+                    },
+                    "uuid": "e112f5e4-a810-4cbc-943b-5bcfa77c89a6"
+                },
+                {
+                    "description": "Reference field of R17",
+                    "pos": {
+                        "x": 100.17,
+                        "y": 55.0
+                    },
+                    "uuid": "ee2193c5-0fe0-417f-89f8-b2ae46aec4df"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        }
+    ]
+}

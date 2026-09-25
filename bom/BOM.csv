@@ -1,0 +1,37 @@
+PinaBio v1.0,Ref,Value,Footprint,Qty,LCSC,Notas
+Seeed XIAO ESP32-S3 (modulo),U1,XIAO_ESP32S3,Pina:XIAO_ESP32S3_Socket,1,,DNP modulo; zocalo 2x hembra 1x7 2.54mm + pad BAT+; emparejar en web (p.ej. C2932672 x2) o suelda Alejandro
+ADP150AUJZ-3.3,U2,3.3V LDO,SOT-23-5,1,C29149,ADP150AUJZ-3.3-R7 TSOT-23-5; JLC Extended
+MCP6004-I/SL,U3,MCP6004,SOIC-14,1,C1346056,SOIC-14; JLC Extended
+ADS1115IDGSR,U4,ADS1115,VSSOP-10,1,C37593,ADS1115IDGSR VSSOP-10; JLC Extended
+Ferrita 600ohm,FB1,600R@100MHz,0805,1,C113034,BLM21AJ601SN1D 600ohm@100MHz 0805 Murata
+R 47k 1%,R1 R2 R12 R15,47k,1206,4,C25833,1206W4F4702T5E UNI-ROYAL 1%; JLC Extended (no hay Basic 1206 47k)
+R 56k 0.1%,R3,56k,1206,1,C4257433,MCA12060D5602BP100 Vishay 0.1%; Extended; stock en web
+R 10k 0.1%,R4,10k,1206,1,C2507497,RNCF1206BTC10K0 Stackpole 0.1%; Extended; stock en web
+R 47 1%,R5,47,1206,1,C17969,1206W4F470JT5E UNI-ROYAL; Extended
+R 10k 1%,R6,10k,1206,1,C17902,1206W4F1002T5E UNI-ROYAL; JLC Basic
+R 2.2k 1%,R7 R8,2.2k,1206,2,C17948,1206W4F2201T5E UNI-ROYAL; Extended
+R 100k 1%,R9,100k,1206,1,C17900,1206W4F1003T5E UNI-ROYAL; JLC Basic
+R 470 1%,R10 R13 R16,470,1206,3,C4502,1206W4F4700T5E UNI-ROYAL; Extended
+R 1k 1%,R11 R14 R17 R18,1k,1206,4,C4410,1206W4F1001T5E UNI-ROYAL; JLC Basic
+C 1uF,C1 C2 C8,1uF,1206,3,C1848,CL31B105KBHNNNE 1uF 50V X7R 1206 Samsung; JLC Basic
+C 10uF,C4,10uF,1206,1,C13585,CL31A106KBHNNNE 10uF 50V X5R 1206 Samsung; JLC Basic
+C 4.7uF,C5,4.7uF,1206,1,C29823,1206B475K500NT 4.7uF 50V X7R 1206 FH; JLC Basic
+C 100nF,C6 C7 C9 C10 C11 C12 C13 C14,100nF,1206,8,C24497,CL31B104KBCNNNC 100nF 50V X7R 1206 Samsung; JLC Basic
+TVS 5V SOD-323,D1 D2 D3,PESD5V0S1BA,SOD-323,3,C19224,PESD5V0S1BA SOD-323 bidir (PESD5V0S1UL es DFN1006; no encaja en este footprint)
+Net-tie,NT1,NetTie-2,,1,,DNP / cobre; no es componente de fabrica
+JST PH 2P,J1 J2 J10,LiPo / 5V / BATT METER,JST_PH_S2B-PH-K,3,C173752,S2B-PH-K-S(LF)(SN) TH R/A; JLC wave/THT
+JST PH 4P,J9,INT CAJA DPDT,JST_PH_S4B-PH-K,1,C157926,S4B-PH-K-S(LF)(SN) TH R/A; fabrica monta conector NO slide
+Borne 2P 5.08,J3 J6 J7,GSR / pecho / abdomen,Metz RT01602HBWC 5.08 2P H,3,,emparejar en web: Metz RT01602HBWC; candidato KF128R-5.08-2P C475082 (verificar cuerpo vs footprint)
+Pads 4P,J4 J5,MAX30102 / MAX30205,Pina:SensorCable_4P_Anchor,2,,DNP fabrica (solo pads)
+Pads 6P,J8,AD8232,Pina:SensorCable_6P_Anchor,1,,DNP fabrica (solo pads)
+M3,H1-H4,M3,MountingHole_3.2mm_M3,4,,DNP
+SW1 (no existe),,,,0,,No hay slide en placa; DPDT va en panel/caja a J9
+Modulo MAX30102,,,,1,,DNP fabrica
+Modulo MAX30205,,,,1,,DNP fabrica
+Modulo AD8232,,,,1,,DNP fabrica
+Banda goma resistiva pecho,,,,1,,
+Banda goma resistiva abdomen,,,,1,,
+LiPo 1S con proteccion,,,,1,,
+Electrodos GSR,,,,1,,
+Electrodos ECG del AD8232,,,,1,,
+NOTA ensamblaje,,,,,,"Soldar todo SMD (ADS1115, resto), zocalo XIAO, J1 J2 J10, bornes J3 J6 J7, conector J9. NO montar slide SW1. LCSC verificados en jlcpcb.com/lcsc.com 2026-09-12; stock y Basic/Extended cambian — revisar en el carrito."

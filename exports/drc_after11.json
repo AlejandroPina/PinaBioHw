@@ -1,0 +1,195 @@
+{
+    "$schema": "https://schemas.kicad.org/drc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-09-12T08:59:13+0000",
+    "kicad_version": "9.0.2",
+    "schematic_parity": [],
+    "source": "PinaBiosensor_Mini.kicad_pcb",
+    "unconnected_items": [
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "068d488b-dae9-4287-92e7-728976323415"
+                },
+                {
+                    "description": "Zone [GNDD] on B.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "e7040690-8fa2-4b6e-a184-d213bfec9f6b"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "068d488b-dae9-4287-92e7-728976323415"
+                },
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "068d488b-dae9-4287-92e7-728976323415"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c032c55e-dd52-4930-bf74-876b38f1d2a7"
+                },
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c032c55e-dd52-4930-bf74-876b38f1d2a7"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c032c55e-dd52-4930-bf74-876b38f1d2a7"
+                },
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c032c55e-dd52-4930-bf74-876b38f1d2a7"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDA] on B.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "84068b2d-4e8e-4fcc-af02-4e9ddf4d6085"
+                },
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c032c55e-dd52-4930-bf74-876b38f1d2a7"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        }
+    ],
+    "violations": [
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [VBAT_DIV] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 40.0,
+                        "y": 20.0
+                    },
+                    "uuid": "e9fee07c-5007-4e41-8e95-2017a8fff204"
+                }
+            ],
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [+3V3] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 30.0,
+                        "y": 45.0
+                    },
+                    "uuid": "3f12c220-7caf-4c80-b517-b0600c3cac9f"
+                }
+            ],
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [V_BATT] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 20.0,
+                        "y": 30.0
+                    },
+                    "uuid": "375cdaaa-e57c-49d3-bea5-a6ad0dbe0156"
+                }
+            ],
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J7 ABD' on F.Silkscreen",
+                    "pos": {
+                        "x": 98.0,
+                        "y": 55.0
+                    },
+                    "uuid": "e112f5e4-a810-4cbc-943b-5bcfa77c89a6"
+                },
+                {
+                    "description": "Reference field of R17",
+                    "pos": {
+                        "x": 100.17,
+                        "y": 55.0
+                    },
+                    "uuid": "ee2193c5-0fe0-417f-89f8-b2ae46aec4df"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        }
+    ]
+}

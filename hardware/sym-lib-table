@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name Pina)(type KiCad)(uri ${KIPRJMOD}/sym-lib/Pina.kicad_sym)(options "")(descr "PinaBiosensor Mini"))
+)

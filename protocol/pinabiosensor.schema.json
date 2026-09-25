@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pinabiosensor.local/mini/v2",
+  "title": "PinaBiosensor Mini telemetry v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "ms",
+    "gsr_uS",
+    "t_c",
+    "hr",
+    "rr_ms",
+    "ir",
+    "batt_v",
+    "ok"
+  ],
+  "properties": {
+    "v": {
+      "type": "integer",
+      "const": 2,
+      "description": "Version of this JSON object."
+    },
+    "ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Milliseconds since the board booted (millis())."
+    },
+    "gsr_uS": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Skin conductance in microsiemens."
+    },
+    "t_c": {
+      "type": "number",
+      "description": "MAX30205 temperature in Celsius."
+    },
+    "hr": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 240,
+      "description": "Instant heart rate from IR peaks. 0 if no finger. Not HRV."
+    },
+    "rr_ms": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 300, "maximum": 1500 },
+      "description": "New inter-beat intervals since the previous packet, in milliseconds. Empty if none. Phone computes HRV from these."
+    },
+    "ir": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Raw MAX30102 infrared ADC count."
+    },
+    "batt_v": {
+      "type": "number",
+      "minimum": 0,
+      "description": "LiPo voltage after the 1/2 divider."
+    },
+    "ok": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 31,
+      "description": "Bitmask: 1=ADS1115, 2=MAX30102, 4=MAX30205, 8=finger on PPG, 16=shutdown requested."
+    }
+  }
+}

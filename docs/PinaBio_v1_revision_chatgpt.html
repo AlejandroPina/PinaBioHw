@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>PinaBio v1.0 Paca — ficha para ChatGPT</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", serif; font-size: 11pt; line-height: 1.35; color: #111; max-width: 48rem; margin: 1.2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.55rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.2rem; margin-top: 1.4rem; border-bottom: 1px solid #333; padding-bottom: 0.15rem; }
+  h3 { font-size: 1.05rem; margin-top: 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 9.5pt; margin: 0.6rem 0 1rem; }
+  th, td { border: 1px solid #444; padding: 0.22rem 0.35rem; vertical-align: top; }
+  th { background: #eee; }
+  pre, code { font-family: "SF Mono", Consolas, monospace; font-size: 8.5pt; }
+  pre { background: #f4f4f4; padding: 0.6rem; white-space: pre-wrap; word-break: break-word; }
+  .note { background: #fff8d8; border: 1px solid #c9a227; padding: 0.6rem 0.8rem; margin: 0.8rem 0; }
+  @media print { body { max-width: none; margin: 0; } }
+</style>
+</head>
+<body>
+
+<p class="note"><b>Instrucción para ChatGPT:</b> eres un revisor senior de electrónica analógica, KiCad, ESP32 y BLE. No endulces. Trabaja solo con este documento. Responde en español. No pidas Gerbers. Al final responde las 8 preguntas de la sección G. No cambies el nombre BLE ni conviertas esto en un producto médico IEC 60601.</p>
+
+<h1>PinaBio v1.0 (Paca) — diseño fabricado, firmware y críticas</h1>
+<p>Placa ya pedida a JLCPCB. Pedido <b>SMT026091261919</b> (5 PCB + 2 PCBA). No se cancela. Nombre BLE exacto: <code>PinaBiosensor</code>. App Android: <code>com.pinabiosensor.mini</code>. Prototipo de biofeedback / laboratorio personal. No diagnostica.</p>
+
+<h2>A. Encargo</h2>
+<ol>
+<li>Validar si lo fabricado + firmware puede funcionar (GSR + PPG/HRV en el móvil + temp + 2 bandas + ECG de juguete).</li>
+<li>Separar fallos de cobre / firmware / falsos positivos de Gemini y Claude.</li>
+<li>Qué merece Rev 2 de PCB y qué no.</li>
+<li>Protocolo BLE binario (además o en lugar de JSON v3) y apaño ECG AD8232 → ADC del XIAO en esta placa.</li>
+<li>Riesgos USB + piel, sin fingir certificación médica.</li>
+</ol>
+<p><b>No cambiar:</b> ADP150AUJZ-3.3 en este análisis; sleep en D3/GPIO4 (nunca GPIO3); I2C MAX/ADS alimentados desde +3V3 del XIAO (no V_ANALOG) para evitar back-power; HRV lo calcula el teléfono.</p>
+
+<h2>B. Hardware enviado a fabricar</h2>
+<h3>B.1 Qué mide</h3>
+<ol>
+<li>GSR en borne J3 (2 pines).</li>
+<li>PPG: MAX30102 externo, pads J4, I2C 0x57.</li>
+<li>Temp: MAX30205 en J5, 0x48.</li>
+<li>ECG laboratorio: módulo AD8232 (SparkFun/clones), pads J8 6P.</li>
+<li>Bandas resistivas tórax J6 y abdomen J7.</li>
+<li>Tensión LiPo 1S (el % lo hace el teléfono).</li>
+</ol>
+<p>Sesión con piel: solo BLE. USB-C del XIAO solo programar/cargar con electrodos fuera.</p>
+
+<h3>B.2 Mecánica y RF as-built</h3>
+<ul>
+<li>110 × 70 mm útiles (panel 110 × 80 = riel 5 + placa + riel 5). FR-4 1,6 mm, 2 capas, 1 oz, HASL, vias tented, verde.</li>
+<li>Taladros M3 H1–H4.</li>
+<li>Zócalo XIAO U1 en (20, 20) mm. USB hacia Y=0 pero no al borde. Cobre GNDD bajo el módulo.</li>
+<li>Antena Seeed ESP32-S3: U.FL + cable de la bolsa, no cerámica en USB. Sin cable BLE flojo. Caja plástico; no metal ni LiPo bajo el XIAO.</li>
+<li>Layout RF “v1.1” existe y NO es este pedido.</li>
+</ul>
+
+<h3>B.3 Alimentación</h3>
+<pre>LiPo 1S (con PCB protección) —J1— V_BATT —hilo— pad BAT+ XIAO (U1 pad 15)
+                         |— J10 medidor (paralelo J1)
+                         |— J9 pin2 —[DPDT polo A ON]— J9 pin1 LDO_VIN
+USB-C XIAO — cargador del módulo (el DPDT NO debe cortar esto)
+U2 ADP150AUJZ-3.3  VIN=EN=LDO_VIN  pin4=NC (TSOT-23-5, NO es BYP)
+  VOUT=LDO_OUT — FB1 600Ω@100MHz — V_ANALOG
+  C1 1µF VIN, C2 1µF VOUT, C4 10µF en V_ANALOG
+XIAO 3V3 → +3V3 → ADS1115, MAX30102, MAX30205, pull-ups R7/R8
+XIAO 5V  → +5V  → J2 opcional (NO es la vía LiPo)
+XIAO GND → GNDD — net-tie NT1 — GNDA</pre>
+<p><b>DPDT caja J9</b> JST-PH 4P. Fábrica monta conector, no slide en PCB.</p>
+<table>
+<tr><th>J9</th><th>Seda</th><th>Net</th><th>Polo</th></tr>
+<tr><td>1</td><td>ANALOG</td><td>LDO_VIN</td><td>A a BAT en ON</td></tr>
+<tr><td>2</td><td>BAT</td><td>V_BATT</td><td>A</td></tr>
+<tr><td>3</td><td>SLEEP</td><td>SLEEP_N</td><td>B a GND en OFF</td></tr>
+<tr><td>4</td><td>GND</td><td>GNDD</td><td>B</td></tr>
+</table>
+<p>OFF: SLEEP_N a masa → deep sleep. ON: SLEEP_N flota, pull-up GPIO4. Mal cableado puede cortar carga o dejar LDO siempre on. Sin fusible ni p-FET de polaridad. El DPDT apaga V_ANALOG (MCP6004, GSR, bandas, AD8232). No apaga ADS/MAX (+3V3).</p>
+
+<h3>B.4 MCU zócalo U1 — Seeed XIAO ESP32-S3</h3>
+<p>2× tira hembra 1×7, paso 2,54 mm, filas 17,78 mm. Pad 15 BAT+ necesita hilo al pad BAT+ debajo del módulo. USB hacia seda USB (Y menor). Izquierda 1–7, derecha 14…8.</p>
+<table>
+<tr><th>Pad</th><th>Seeed</th><th>GPIO</th><th>Net v1.0</th><th>Firmware actual</th></tr>
+<tr><td>1</td><td>D0/A0</td><td>GPIO1</td><td>VBAT_DIV</td><td>analogReadMilliVolts(A0)*2</td></tr>
+<tr><td>2</td><td>D1</td><td>GPIO2</td><td>LIBRE</td><td>—</td></tr>
+<tr><td>3</td><td>D2</td><td>GPIO3</td><td>libre</td><td>NO sleep (strapping)</td></tr>
+<tr><td>4</td><td>D3</td><td>GPIO4</td><td>SLEEP_N</td><td>ISR FALLING; EXT0 wake=1</td></tr>
+<tr><td>5</td><td>D4</td><td>GPIO5</td><td>SDA</td><td>Wire</td></tr>
+<tr><td>6</td><td>D5</td><td>GPIO6</td><td>SCL</td><td>400 kHz</td></tr>
+<tr><td>7</td><td>D6</td><td>GPIO43</td><td>libre</td><td>—</td></tr>
+<tr><td>8</td><td>D7</td><td>GPIO44</td><td>libre</td><td>—</td></tr>
+<tr><td>9</td><td>D8</td><td>GPIO7</td><td>ECG_LOP</td><td>leads-off +</td></tr>
+<tr><td>10</td><td>D9</td><td>GPIO8</td><td>ECG_LON</td><td>leads-off −</td></tr>
+<tr><td>11</td><td>D10</td><td>GPIO9</td><td>LIBRE</td><td>—</td></tr>
+<tr><td>12</td><td>3V3</td><td></td><td>+3V3</td><td></td></tr>
+<tr><td>13</td><td>GND</td><td></td><td>GNDD</td><td></td></tr>
+<tr><td>14</td><td>5V</td><td></td><td>+5V</td><td></td></tr>
+<tr><td>15</td><td>BAT+</td><td></td><td>V_BATT</td><td>hilo</td></tr>
+</table>
+<p>Divisor batería en PCB: R1=R2=47 kΩ 1% (V_BATT→VBAT_DIV→GNDD) relación 1/2. El comentario FW “divisor 1/2 en el XIAO” es falso en el S3. Pull-ups I2C R7 y R8 = 2,2 kΩ a +3V3 (están en placa).</p>
+
+<h3>B.5 V_REF 0,50 V y MCP6004 (U3, SOIC-14, C1346056)</h3>
+<p>R3 56 kΩ + R4 10 kΩ desde V_ANALOG → ~0,500 V. Intención 0,1%. As-built DFM: R3 C18029 (no 0,1%), R4 C17902 10 k 1% Basic. V+ = V_ANALOG, V− = GNDA.</p>
+<table>
+<tr><th>Unidad</th><th>Patas</th><th>Función</th></tr>
+<tr><td>A</td><td>1–2 unidos, 3=VREF_DIV</td><td>Seguidor V_REF. R5 47 Ω + C5 4,7 µF; realimentación ANTES de R5</td></tr>
+<tr><td>B</td><td>5=TH_MID, 6–7 unidos</td><td>Seguidor tórax</td></tr>
+<tr><td>C</td><td>10=AB_MID, 8–9 unidos</td><td>Seguidor abdomen</td></tr>
+<tr><td>D</td><td>12 a GNDA, 13–14 unidos</td><td>Aparcado</td></tr>
+</table>
+<p>En el PCB estas redes existen por separado. El fichero .kicad_sch es otro cantar (sección B.13).</p>
+
+<h3>B.6 GSR J3</h3>
+<pre>V_REF 0,50 V — R9 100k — GSR_MID — R11 1k — GSR_ELEC — J3 SIG
+                    |                 └ D1 PESD5V0S1BA — GNDA
+                    └ R10 470Ω — GSR_AIN — ADS AIN1 ganancia ×8 (±0,512 V)
+J3 GNDA — GNDA</pre>
+<p>Cortocircuito J3: ~5 µA. No es aislamiento de paciente. FW: V_REF fijo 0,50; NO resta R11.</p>
+<pre>si vMid &lt; 2 mV o vMid &gt; 0,98*V_REF → gsr_uS = 0
+rSkin = 100e3 * vMid / (0,50 - vMid)
+gsr_uS = 1e6 / rSkin   (si rSkin ≥ 100 Ω)</pre>
+
+<h3>B.7 Bandas J6 J7</h3>
+<p>R serie 47 kΩ (R12 tórax, R15 abdomen), TVS D2/D3, 1 kΩ serie, seguidores B/C, ADS AIN2/AIN3 a ganancia ×1. Móvil calibra min/max ~20 s. JSON rt_v y ra_v en voltios ADC, no litros.</p>
+
+<h3>B.8 ECG J8 + AD8232</h3>
+<p>Seda “3V3” en J8 es V_ANALOG, no el 3V3 del XIAO.</p>
+<table>
+<tr><th>Pad</th><th>Net</th><th>Uso módulo</th></tr>
+<tr><td>1</td><td>V_ANALOG</td><td>VCC</td></tr>
+<tr><td>2</td><td>GNDA</td><td>GND</td></tr>
+<tr><td>3</td><td>ECG_OUT</td><td>OUTPUT — R18 1k — ECG_AIN — ADS AIN0 ×1</td></tr>
+<tr><td>4</td><td>ECG_LOP</td><td>LO+ → D8</td></tr>
+<tr><td>5</td><td>ECG_LON</td><td>LO− → D9</td></tr>
+<tr><td>6</td><td>V_ANALOG</td><td>SDN activo en alto</td></tr>
+</table>
+<p>ecg_mv = voltios ADS × 1000. Sin TVS en J8 (solo R18). ADS1115 llega a 860 SPS. Firmware: ECG_N=8 cada 200 ms → ≤40 Hz. El cuello es protocolo y mux, no el chip. D1 (GPIO2 ADC1) y D10 (GPIO9 ADC1) libres para hilo ECG_AIN→D1.</p>
+
+<h3>B.9 ADS1115 U4 — 0x49 — pinout DGS SBAS444E dic 2024 (RUG/DYN/DGS unificados)</h3>
+<p>ADS1115IDGSR VSSOP-10 C37593. VDD=+3V3 GND=GNDA. Comprobado en .kicad_pcb.</p>
+<table>
+<tr><th>Pin</th><th>Función</th><th>Net PCB</th></tr>
+<tr><td>1 ADDR</td><td>a VDD → 0x49</td><td>+3V3</td></tr>
+<tr><td>2 ALERT</td><td>sin GPIO FW</td><td>ADS_ALERT</td></tr>
+<tr><td>3 GND</td><td></td><td>GNDA</td></tr>
+<tr><td>4 AIN0</td><td>ECG ×1</td><td>ECG_AIN</td></tr>
+<tr><td>5 AIN1</td><td>GSR ×8</td><td>GSR_AIN</td></tr>
+<tr><td>6 AIN2</td><td>tórax ×1</td><td>TH_AIN</td></tr>
+<tr><td>7 AIN3</td><td>abdomen ×1</td><td>AB_AIN</td></tr>
+<tr><td>8 VDD</td><td></td><td>+3V3</td></tr>
+<tr><td>9 SDA</td><td></td><td>SDA</td></tr>
+<tr><td>10 SCL</td><td></td><td>SCL</td></tr>
+</table>
+<p>MAX30205 0x48 no choca. No uses pinout DGS antiguo (AIN0 en pin 2).</p>
+
+<h3>B.10 I2C J4 J5</h3>
+<p>Pads 4P +3V3 GNDD SDA SCL. C10/C11 100 nF. Cables soldados. Sin TVS ni 22–47 Ω. 400 kHz + cables largos = margen pobre.</p>
+
+<h3>B.11 Conectores, ESD, BOM</h3>
+<table>
+<tr><th>Ref</th><th>Pieza</th><th>Notas</th></tr>
+<tr><td>J1 J2 J10</td><td>JST-PH 2P C173752</td><td>LiPo / +5V / medidor</td></tr>
+<tr><td>J9</td><td>JST-PH 4P C157926</td><td>DPDT caja</td></tr>
+<tr><td>J3 J6 J7</td><td>KF128 5.08 C475082 DFM</td><td>piel / goma</td></tr>
+<tr><td>J4 J5 J8</td><td>solo pads</td><td>DNP fábrica</td></tr>
+<tr><td>U2</td><td>ADP150AUJZ-3.3 C29149</td><td>pin 4 NC</td></tr>
+<tr><td>U3</td><td>MCP6004 C1346056</td><td>SOIC-14</td></tr>
+<tr><td>U4</td><td>ADS1115IDGSR C37593</td><td>VSSOP-10</td></tr>
+<tr><td>D1 D2 D3</td><td>PESD5V0S1BA C19224</td><td>SOD-323 bidir; sch a veces dice UL (encapsulado distinto); fábrica es BA</td></tr>
+</table>
+<p>ESD hay en tres bornes de piel. No hay en I2C, SLEEP_N, V_BATT, J8, ni aislamiento USB↔piel. U1 no está en DFM (45 piezas top). Pin 1 U2/U3/U4 = triángulo de seda, no el 3D JLCPCB.</p>
+
+<h3>B.13 Fichero .kicad_sch vs PCB</h3>
+<p>El sch del repo se generó sin wires, solo etiquetas globales. Claude vio Y invertida, 23 etiquetas que no tocan pin, MCP6004 una sola unidad, etiquetas apiladas. Eso es el DIBUJO. El PCB pedido tiene nets y pads coherentes con esta ficha y datasheets 2024. ERC del sch puede ser rojo y el cobre correcto. Criterio: PCB/polímetro, no el sch hasta rehacerlo.</p>
+
+<h2>C. Firmware (DEMO_BLE=0)</h2>
+<p>Arduino-ESP32, un .ino. Wire, Adafruit ADS1X15, SparkFun MAX30105 + heartRate.h, BLE, rtc_io.</p>
+<ul>
+<li>JSON cada 200 ms. BLE PinaBiosensor. MTU 247.</li>
+<li>Servicio 6b1d0001-5e8a-4c2f-9b3a-2c7f0e1a4d90 — JSON 6b1d0002-…</li>
+<li>HR 0x180D / 0x2A37 flags 0x10 (uint8 + RR 1/1024 s). 0x2A38=3 finger.</li>
+<li>V_REF=0.50 R_SERIES=100e3 IR_FINGER_MIN=20000 IBI 300–1500 ms ECG_N=8 RR_Q=8.</li>
+<li>ok: 1 ADS, 2 PPG, 4 TEMP, 8 FINGER, 16 SHUTDOWN.</li>
+</ul>
+<pre>setup: D3 pullup, D8/D9 input, ADC 12 bit, I2C 400 kHz
+  ads.begin(0x49), GAIN_EIGHT, 860 SPS
+  ppg 0x57: 100 sps, IR 0x1F, red 0x0A
+  ping 0x48; ISR D3 FALLING; BLE JSON + 0x180D
+loop:
+  processIr(ppg.getIR())  // checkForBeat; notify Polar si IBI válido
+  sampleEcg(): GAIN_ONE, readADC_SingleEnded(0), buffer máx 8
+  si SLEEP_N low &gt; 40 ms: JSON SHUTDOWN, BLE off, EXT0 GPIO4=1, deep sleep
+     NO shutdown MAX30102 ni MAX30205
+  cada 200 ms:
+    Vbat = analogReadMilliVolts(A0)/1000*2
+    GAIN_EIGHT AIN1 GSR; GAIN_ONE AIN2 AIN3; MAX30205
+    notify JSON + Serial</pre>
+<p>readADC_SingleEnded bloqueante. Cambio ×8/×1 inyecta carga en mux (no medido en lab). Sin CRC, seq, bonding, watchdog. JSON ~300 B; sin negociación MTU puede cortarse. DEMO_BLE=1 = senos falsos sin I2C.</p>
+<pre>{"v":3,"ms":12345,"gsr_uS":8.42,"t_c":33.16,"hr":72,"rr_ms":[833],"ir":87421,"batt_v":3.87,"ok":15,"lo":0,"rt_v":0.182,"ra_v":0.165,"ecg_mv":[1650,1662,1640]}</pre>
+
+<h2>D. Críticas Gemini (y contra)</h2>
+<p><b>G1. Cap BYP en pin 4 ADP150.</b> Pieza AUJZ: pin 4 es NC, no BYP. No añadir C3.</p>
+<p><b>G2. MOSFET que corte VBAT_DIV.</b> 47k+47k ≈ 35–45 µA. Idea válida, poco impacto vs MAX vivos. P2. GPIO debe quedar OFF en deep sleep.</p>
+<p><b>G3. USBLC6-2SC6 en J9/J10/I2C.</b> Hueco ESD real en I2C/SLEEP/V_BATT. Pieza USB incorrecta. D1–D3 ya cubren piel. Rev 2: TVS 3V3 + series en I2C, no USBLC6 en batería.</p>
+<p><b>G4. Faltan pull-ups I2C.</b> Falso. R7/R8=2,2 kΩ.</p>
+
+<h2>E. Críticas Claude (y contra)</h2>
+<p><b>E1. Sch KiCad “roto” bloqueante.</b> Cierto del fichero de dibujo. Falso si se aplica al PCB pedido (pads U4/U3/U2/XIAO coherentes). Al llegar: polímetro ADS pin8=3,3 V, pin3=GND, pin10=SCL.</p>
+<p><b>E2. Shutdown MAX antes de deep sleep.</b> Cierto. Firmware. Si no, ~mA en “apagado”.</p>
+<p><b>E3. ECG fuera del ADS, ≥250 Hz, BLE binario, notch 50 Hz en móvil.</b> 8 muestras/200 ms no resuelven QRS. ADS sí llega a 860 SPS. En esta placa: (a) muestrear AIN0 en bucle + característica BLE; (b) hilo ECG_AIN→D1. Segundo ADS: solo Rev 2.</p>
+<p><b>E4. GSR y bandas ×8; restar R11 1 kΩ; promedio; tirar 1ª muestra tras mux.</b> Cierto, casi todo firmware.</p>
+<p><b>E5. 100 nF en VBAT_DIV; opcional 220k/220k.</b> El cap ayuda al ADC S3. 220k ahorra poco.</p>
+<p><b>E6. Detectar VBUS</b> divisor 100k/100k desde pin 5V del XIAO (ya en placa como +5V) a D6/D7. USB presente → no piel. Aislador USB no salva del todo con GNDA=GNDD.</p>
+<p><b>E7. R3/R4 0,1% no merecen respin.</b> Medir V_REF y guardar en NVS. De acuerdo.</p>
+<p><b>E8. Rev 2:</b> buffer GSR con opamp D; ADS_ALERT a GPIO; keepout antena. Razonable.</p>
+<p><b>E9. TVS UL vs BA; nombres Mini/Completa/Paca.</b> Fábrica = BA. Cosmético.</p>
+
+<h2>F. Decisiones del dueño</h2>
+<ul>
+<li>Pedido en fabricación; no cambiar Gerbers de este SMT.</li>
+<li>Quiere trama BLE no texto al menos para ECG.</li>
+<li>Quiere conectar AD8232 al ADC del XIAO (D1) y no usar ADS para ECG.</li>
+<li>Quiere saber si v1.0 funcionará al llegar y qué meter en Rev 2.</li>
+</ul>
+
+<h2>G. Preguntas que ChatGPT debe responder</h2>
+<ol>
+<li>¿El cobre de v1.0 (PCB, no el sch) es coherente para GSR, bandas, LDO, I2C, DPDT, ADS DGS 2024?</li>
+<li>¿El firmware actual hará ver GSR/PPG/temp/bandas en Android JSON v3, con qué matices?</li>
+<li>ECG: ¿por qué no es “de verdad”? ¿ADS lento o FW/protocolo? ¿Hilo a D1 vs muestrear AIN0 más rápido vs JSON→binario? Ganancias y pérdidas.</li>
+<li>Protocolo: ¿matar JSON, híbrido, o binario único? Layout de bytes, MTU, seq/CRC, impacto en app y 0x180D.</li>
+<li>Tabla G1–G4 y E1–E9: de acuerdo / no / a medias, y firmware / hilo / Rev 2 / no hacer.</li>
+<li>Lista Rev 2 mínima que sí pagaría otra tanda, y lista de no.</li>
+<li>Checklist de puesta en marcha al llegar el PCBA.</li>
+<li>Riesgos que podrían hacer que NO funcione (I2C 400 kHz, back-power, DPDT, pin1, RF, USB+piel).</li>
+</ol>
+<p>No rediseñes un producto médico. No cambies el BLE name. No inventes pinout DGS pre-2024.</p>
+</body>
+</html>

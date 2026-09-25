@@ -1,0 +1,824 @@
+{
+    "$schema": "https://schemas.kicad.org/drc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-09-12T08:52:05+0000",
+    "kicad_version": "9.0.2",
+    "schematic_parity": [],
+    "source": "PinaBiosensor_Mini.kicad_pcb",
+    "unconnected_items": [
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "9581bddf-143b-4054-8cfd-4d1096479006"
+                },
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "9581bddf-143b-4054-8cfd-4d1096479006"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Track [GNDD] on B.Cu, length 8.7290 mm",
+                    "pos": {
+                        "x": 60.0,
+                        "y": 12.3
+                    },
+                    "uuid": "fab07f2b-e4cb-4a76-aeac-0213477ea68f"
+                },
+                {
+                    "description": "Track [GNDD] on F.Cu, length 3.1805 mm",
+                    "pos": {
+                        "x": 50.682,
+                        "y": 22.0
+                    },
+                    "uuid": "955eb720-4333-4105-a877-9c374f2cbfc1"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "9581bddf-143b-4054-8cfd-4d1096479006"
+                },
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "9581bddf-143b-4054-8cfd-4d1096479006"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "9581bddf-143b-4054-8cfd-4d1096479006"
+                },
+                {
+                    "description": "Zone [GNDD] on F.Cu",
+                    "pos": {
+                        "x": 0.5,
+                        "y": 0.5
+                    },
+                    "uuid": "9581bddf-143b-4054-8cfd-4d1096479006"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c3fcfdf2-c80d-4fbf-921b-9c6e71ec0076"
+                },
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c3fcfdf2-c80d-4fbf-921b-9c6e71ec0076"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c3fcfdf2-c80d-4fbf-921b-9c6e71ec0076"
+                },
+                {
+                    "description": "Zone [GNDA] on F.Cu",
+                    "pos": {
+                        "x": 49.0,
+                        "y": 0.5
+                    },
+                    "uuid": "c3fcfdf2-c80d-4fbf-921b-9c6e71ec0076"
+                }
+            ],
+            "severity": "error",
+            "type": "unconnected_items"
+        }
+    ],
+    "violations": [
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C7",
+                    "pos": {
+                        "x": 96.0,
+                        "y": 9.0
+                    },
+                    "uuid": "3369d86a-fd9f-443e-8eb0-f715ed22bc59"
+                },
+                {
+                    "description": "Footprint R18",
+                    "pos": {
+                        "x": 95.0,
+                        "y": 7.0
+                    },
+                    "uuid": "6cc5e5a9-035a-4b4d-a089-43c10f38fca2"
+                }
+            ],
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Reference field of C7",
+                    "pos": {
+                        "x": 96.0,
+                        "y": 7.15
+                    },
+                    "uuid": "3366e132-a6a7-4693-be31-00d48258c679"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Segment of U1 on F.Silkscreen",
+                    "pos": {
+                        "x": 31.5,
+                        "y": 32.5
+                    },
+                    "uuid": "4cc2f876-ce8e-410a-abf8-50516ded95b1"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J8 ECG' on F.Silkscreen",
+                    "pos": {
+                        "x": 72.0,
+                        "y": 3.2
+                    },
+                    "uuid": "70ec70ec-4563-4c21-be59-6bf1f0462d20"
+                },
+                {
+                    "description": "Footprint text of J8 (GND)",
+                    "pos": {
+                        "x": 70.54,
+                        "y": 4.2
+                    },
+                    "uuid": "d37995da-8a88-4f31-adf6-8047ebdbb5f8"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J8 (3V3)",
+                    "pos": {
+                        "x": 68.0,
+                        "y": 4.2
+                    },
+                    "uuid": "d224065b-62a3-4c99-a501-0313ecc16aef"
+                },
+                {
+                    "description": "Footprint text of J8 (GND)",
+                    "pos": {
+                        "x": 70.54,
+                        "y": 4.2
+                    },
+                    "uuid": "d37995da-8a88-4f31-adf6-8047ebdbb5f8"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J5 (SDA)",
+                    "pos": {
+                        "x": 37.08,
+                        "y": 55.2
+                    },
+                    "uuid": "5a7bc2d5-cef0-428c-bc8c-c4fe55599374"
+                },
+                {
+                    "description": "Footprint text of J5 (GND)",
+                    "pos": {
+                        "x": 34.54,
+                        "y": 55.2
+                    },
+                    "uuid": "7bf42afb-cdc8-4dd4-8345-16cc28cf4449"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J5 (GND)",
+                    "pos": {
+                        "x": 34.54,
+                        "y": 55.2
+                    },
+                    "uuid": "7bf42afb-cdc8-4dd4-8345-16cc28cf4449"
+                },
+                {
+                    "description": "Footprint text of J5 (VCC)",
+                    "pos": {
+                        "x": 32.0,
+                        "y": 55.2
+                    },
+                    "uuid": "d894e9f6-ed75-4cc8-a70e-33c6ad320afc"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J5 (SCL)",
+                    "pos": {
+                        "x": 39.62,
+                        "y": 55.2
+                    },
+                    "uuid": "418e1517-fa2f-4a93-82bf-f62b4cf164fa"
+                },
+                {
+                    "description": "Footprint text of J5 (SDA)",
+                    "pos": {
+                        "x": 37.08,
+                        "y": 55.2
+                    },
+                    "uuid": "5a7bc2d5-cef0-428c-bc8c-c4fe55599374"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Reference field of C12",
+                    "pos": {
+                        "x": 48.0,
+                        "y": 52.15
+                    },
+                    "uuid": "05651c84-d2a0-4898-8795-00ef30ffd04c"
+                },
+                {
+                    "description": "Segment of D2 on F.Silkscreen",
+                    "pos": {
+                        "x": 47.15,
+                        "y": 51.61
+                    },
+                    "uuid": "645e4fd1-03e0-4b30-add0-22724b7ee941"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Reference field of C12",
+                    "pos": {
+                        "x": 48.0,
+                        "y": 52.15
+                    },
+                    "uuid": "05651c84-d2a0-4898-8795-00ef30ffd04c"
+                },
+                {
+                    "description": "Segment of D2 on F.Silkscreen",
+                    "pos": {
+                        "x": 47.15,
+                        "y": 51.61
+                    },
+                    "uuid": "b012af1b-7bb2-4913-8a81-301f513a7c01"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Reference field of C12",
+                    "pos": {
+                        "x": 48.0,
+                        "y": 52.15
+                    },
+                    "uuid": "05651c84-d2a0-4898-8795-00ef30ffd04c"
+                },
+                {
+                    "description": "Segment of D2 on F.Silkscreen",
+                    "pos": {
+                        "x": 48.85,
+                        "y": 51.61
+                    },
+                    "uuid": "f4afa1c0-7f5a-440e-8c4e-7b6ef7498c0d"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J4 (GND)",
+                    "pos": {
+                        "x": 20.54,
+                        "y": 55.2
+                    },
+                    "uuid": "3da41bfd-d3bd-4009-8749-5ed92fba4b92"
+                },
+                {
+                    "description": "Footprint text of J4 (SDA)",
+                    "pos": {
+                        "x": 23.08,
+                        "y": 55.2
+                    },
+                    "uuid": "fd74959e-1aec-44c6-9a01-083e302b5c12"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J4 (GND)",
+                    "pos": {
+                        "x": 20.54,
+                        "y": 55.2
+                    },
+                    "uuid": "3da41bfd-d3bd-4009-8749-5ed92fba4b92"
+                },
+                {
+                    "description": "Footprint text of J4 (VCC)",
+                    "pos": {
+                        "x": 18.0,
+                        "y": 55.2
+                    },
+                    "uuid": "7623b9be-134a-4c1f-8c33-d74eaa70e47b"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J4 (SCL)",
+                    "pos": {
+                        "x": 25.62,
+                        "y": 55.2
+                    },
+                    "uuid": "14ed4d19-2524-4616-8f63-ce340c314097"
+                },
+                {
+                    "description": "Footprint text of J4 (SDA)",
+                    "pos": {
+                        "x": 23.08,
+                        "y": 55.2
+                    },
+                    "uuid": "fd74959e-1aec-44c6-9a01-083e302b5c12"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Segment of J3 on F.Silkscreen",
+                    "pos": {
+                        "x": 75.34,
+                        "y": 66.12
+                    },
+                    "uuid": "141b9602-836f-47cb-8ce1-62b0b6b1ca86"
+                },
+                {
+                    "description": "PCB text 'J3 GSR' on F.Silkscreen",
+                    "pos": {
+                        "x": 78.0,
+                        "y": 66.5
+                    },
+                    "uuid": "2755394e-8b26-4563-a09f-15c3850cb679"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J3 GSR' on F.Silkscreen",
+                    "pos": {
+                        "x": 78.0,
+                        "y": 66.5
+                    },
+                    "uuid": "2755394e-8b26-4563-a09f-15c3850cb679"
+                },
+                {
+                    "description": "Polygon of J3 on F.Silkscreen",
+                    "pos": {
+                        "x": 78.0,
+                        "y": 66.12
+                    },
+                    "uuid": "84c36af7-8e4e-4566-8d71-5d41bc988470"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J3 GSR' on F.Silkscreen",
+                    "pos": {
+                        "x": 78.0,
+                        "y": 66.5
+                    },
+                    "uuid": "2755394e-8b26-4563-a09f-15c3850cb679"
+                },
+                {
+                    "description": "Segment of J3 on F.Silkscreen",
+                    "pos": {
+                        "x": 78.3,
+                        "y": 66.12
+                    },
+                    "uuid": "31297419-1509-43e6-b7e9-4d0b70fcdc4c"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J7 ABD' on F.Silkscreen",
+                    "pos": {
+                        "x": 90.0,
+                        "y": 66.5
+                    },
+                    "uuid": "32cb2873-b673-40b0-8b7d-8d5e0ad05f76"
+                },
+                {
+                    "description": "Segment of J7 on F.Silkscreen",
+                    "pos": {
+                        "x": 87.34,
+                        "y": 66.12
+                    },
+                    "uuid": "37094a45-0f58-4607-8931-c0a930c868e7"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J7 ABD' on F.Silkscreen",
+                    "pos": {
+                        "x": 90.0,
+                        "y": 66.5
+                    },
+                    "uuid": "32cb2873-b673-40b0-8b7d-8d5e0ad05f76"
+                },
+                {
+                    "description": "Polygon of J7 on F.Silkscreen",
+                    "pos": {
+                        "x": 90.0,
+                        "y": 66.12
+                    },
+                    "uuid": "61285481-db10-46df-a262-37281f01bdd3"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J7 ABD' on F.Silkscreen",
+                    "pos": {
+                        "x": 90.0,
+                        "y": 66.5
+                    },
+                    "uuid": "32cb2873-b673-40b0-8b7d-8d5e0ad05f76"
+                },
+                {
+                    "description": "Segment of J7 on F.Silkscreen",
+                    "pos": {
+                        "x": 90.3,
+                        "y": 66.12
+                    },
+                    "uuid": "f0b34c81-43c2-4d03-95bd-4f882ee78b77"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Segment of J6 on F.Silkscreen",
+                    "pos": {
+                        "x": 58.3,
+                        "y": 66.12
+                    },
+                    "uuid": "818386d9-dde1-4cb4-98a7-8831c13081e0"
+                },
+                {
+                    "description": "PCB text 'J6 PECHO' on F.Silkscreen",
+                    "pos": {
+                        "x": 58.0,
+                        "y": 66.5
+                    },
+                    "uuid": "93315347-85a7-4426-83cc-df37e7ac39e1"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Segment of J6 on F.Silkscreen",
+                    "pos": {
+                        "x": 55.34,
+                        "y": 66.12
+                    },
+                    "uuid": "5093b2ea-6bf2-4408-9da7-d9ddffb26995"
+                },
+                {
+                    "description": "PCB text 'J6 PECHO' on F.Silkscreen",
+                    "pos": {
+                        "x": 58.0,
+                        "y": 66.5
+                    },
+                    "uuid": "93315347-85a7-4426-83cc-df37e7ac39e1"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Segment of J6 on F.Silkscreen",
+                    "pos": {
+                        "x": 55.34,
+                        "y": 57.88
+                    },
+                    "uuid": "881a2bf1-b60b-4b8e-8168-1b58080573c2"
+                },
+                {
+                    "description": "PCB text 'J6 PECHO' on F.Silkscreen",
+                    "pos": {
+                        "x": 58.0,
+                        "y": 66.5
+                    },
+                    "uuid": "93315347-85a7-4426-83cc-df37e7ac39e1"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J6 PECHO' on F.Silkscreen",
+                    "pos": {
+                        "x": 58.0,
+                        "y": 66.5
+                    },
+                    "uuid": "93315347-85a7-4426-83cc-df37e7ac39e1"
+                },
+                {
+                    "description": "Polygon of J6 on F.Silkscreen",
+                    "pos": {
+                        "x": 58.0,
+                        "y": 66.12
+                    },
+                    "uuid": "ec2c20f0-30b4-414e-ac87-60b750712744"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J8 (GND)",
+                    "pos": {
+                        "x": 70.54,
+                        "y": 4.2
+                    },
+                    "uuid": "d37995da-8a88-4f31-adf6-8047ebdbb5f8"
+                },
+                {
+                    "description": "Footprint text of J8 (OUT)",
+                    "pos": {
+                        "x": 73.08,
+                        "y": 4.2
+                    },
+                    "uuid": "df306625-d18e-49f3-a6d1-49cc5f809473"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J8 ECG' on F.Silkscreen",
+                    "pos": {
+                        "x": 72.0,
+                        "y": 3.2
+                    },
+                    "uuid": "70ec70ec-4563-4c21-be59-6bf1f0462d20"
+                },
+                {
+                    "description": "Footprint text of J8 (OUT)",
+                    "pos": {
+                        "x": 73.08,
+                        "y": 4.2
+                    },
+                    "uuid": "df306625-d18e-49f3-a6d1-49cc5f809473"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "PCB text 'J8 ECG' on F.Silkscreen",
+                    "pos": {
+                        "x": 72.0,
+                        "y": 3.2
+                    },
+                    "uuid": "70ec70ec-4563-4c21-be59-6bf1f0462d20"
+                },
+                {
+                    "description": "Reference field of J8",
+                    "pos": {
+                        "x": 74.35,
+                        "y": 2.8
+                    },
+                    "uuid": "97efdb43-4c1b-49f9-8eff-0b2c58d62119"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J8 (LO+)",
+                    "pos": {
+                        "x": 75.62,
+                        "y": 4.2
+                    },
+                    "uuid": "4c8642ea-d83f-43ef-8766-688468ea7b3c"
+                },
+                {
+                    "description": "PCB text 'J8 ECG' on F.Silkscreen",
+                    "pos": {
+                        "x": 72.0,
+                        "y": 3.2
+                    },
+                    "uuid": "70ec70ec-4563-4c21-be59-6bf1f0462d20"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J8 (LO+)",
+                    "pos": {
+                        "x": 75.62,
+                        "y": 4.2
+                    },
+                    "uuid": "4c8642ea-d83f-43ef-8766-688468ea7b3c"
+                },
+                {
+                    "description": "Footprint text of J8 (OUT)",
+                    "pos": {
+                        "x": 73.08,
+                        "y": 4.2
+                    },
+                    "uuid": "df306625-d18e-49f3-a6d1-49cc5f809473"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Footprint text of J8 (LO+)",
+                    "pos": {
+                        "x": 75.62,
+                        "y": 4.2
+                    },
+                    "uuid": "4c8642ea-d83f-43ef-8766-688468ea7b3c"
+                },
+                {
+                    "description": "Footprint text of J8 (LO-)",
+                    "pos": {
+                        "x": 78.16,
+                        "y": 4.2
+                    },
+                    "uuid": "856c84a7-6870-4dc4-8038-25579356dc32"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        }
+    ]
+}

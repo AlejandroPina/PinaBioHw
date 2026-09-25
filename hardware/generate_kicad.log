@@ -1,0 +1,116 @@
+WARNING: KICAD10_SYMBOL_DIR environment variable is missing, so the default KiCad symbol libraries won't be searched. @ [/workspace/PinaBioHw/hardware/<frozen importlib._bootstrap_external>:1026=>/workspace/PinaBioHw/hardware/<frozen importlib._bootstrap>:488]
+WARNING: KICAD6_SYMBOL_DIR environment variable is missing, so the default KiCad symbol libraries won't be searched. @ [/workspace/PinaBioHw/hardware/<frozen importlib._bootstrap_external>:1026=>/workspace/PinaBioHw/hardware/<frozen importlib._bootstrap>:488]
+WARNING: fp-lib-table file was not found. Component footprints are not available.
+WARNING: fp-lib-table file was not found. Component footprints are not available.
+WARNING: fp-lib-table file was not found. Component footprints are not available.
+WARNING: fp-lib-table file was not found. Component footprints are not available.
+WARNING: Missing tag on XIAO_ESP32S3 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:95.
+WARNING: Random tag 4gCax5YLvj generated for XIAO_ESP32S3.
+WARNING: Missing tag on Conn_01x02 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:111.
+WARNING: Random tag wwLaRqHz8r generated for Conn_01x02.
+WARNING: Missing tag on Conn_01x02 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:116.
+WARNING: Random tag m2k9QmHrj7 generated for Conn_01x02.
+WARNING: Missing tag on SW_DPDT_ONOFF instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:121.
+WARNING: Random tag M4csibnjID generated for SW_DPDT_ONOFF.
+WARNING: Missing tag on ADP150-3.3 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:131.
+WARNING: Random tag CC8bLi4hOr generated for ADP150-3.3.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag TYajhqN3Lg generated for C.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag 9VsZ1YHfFw generated for C.
+WARNING: Missing tag on FerriteBead instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:144.
+WARNING: Random tag a3kYoVdNOG generated for FerriteBead.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag G7go2VFvlN generated for C.
+WARNING: Missing tag on NetTie_2 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:150.
+WARNING: Random tag Q7NVQiuBnh generated for NetTie_2.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag sclaBGJfLk generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag LK7vv8mow7 generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag mCZaYduOjf generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag Yz3KlhEjRB generated for R.
+WARNING: Missing tag on MCP6004 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:161.
+WARNING: Random tag IgKE2JyVTB generated for MCP6004.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag y9gDsxD8cs generated for R.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag Msp8XswzZC generated for C.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag 9Esa7yqZQ4 generated for C.
+WARNING: Missing tag on ADS1115IDGS instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:184.
+WARNING: Random tag F37dnt6cZ_ generated for ADS1115IDGS.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag R6tzLrbbK0 generated for R.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag GZ30QVDRlz generated for C.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag gYYF50AwiA generated for C.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag v7ueb_1vAm generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag Z5L0BeVZ2M generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag aqThxMBQNm generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag evH9G5yrca generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag hpGr1GWCkp generated for R.
+WARNING: Missing tag on Conn_01x02 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:59.
+WARNING: Random tag co83FDSFFY generated for Conn_01x02.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag DwwgFlmd9w generated for C.
+WARNING: Missing tag on D_TVS instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:53.
+WARNING: Random tag QeK1PObIiB generated for D_TVS.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag b5gmRZ0ytJ generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag bT7rza2bk_ generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag r3ghSmsnkY generated for R.
+WARNING: Missing tag on Conn_01x02 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:59.
+WARNING: Random tag xDF8k5FIxT generated for Conn_01x02.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag mBLcPbCk99 generated for C.
+WARNING: Missing tag on D_TVS instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:53.
+WARNING: Random tag bIUuzWFysC generated for D_TVS.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag gzg3IGal2g generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag 4QscETzP5s generated for R.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag gxP1mBqI_j generated for R.
+WARNING: Missing tag on Conn_01x02 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:59.
+WARNING: Random tag 6AD6Ox5qP9 generated for Conn_01x02.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag axyrSKy_Ko generated for C.
+WARNING: Missing tag on D_TVS instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:53.
+WARNING: Random tag Sw9kr8vl83 generated for D_TVS.
+WARNING: Missing tag on Conn_01x04 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:227.
+WARNING: Random tag XVK8h5HlwZ generated for Conn_01x04.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag 14u6XKJRMA generated for C.
+WARNING: Missing tag on Conn_01x04 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:236.
+WARNING: Random tag IWhPm5Gc6S generated for Conn_01x04.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag tx_fKmivfb generated for C.
+WARNING: Missing tag on Conn_01x06 instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:245.
+WARNING: Random tag Ch5eHsD5MY generated for Conn_01x06.
+WARNING: Missing tag on R instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:39.
+WARNING: Random tag i5hVOzfanE generated for R.
+WARNING: Missing tag on C instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:46.
+WARNING: Random tag SRlTCb_h_E generated for C.
+WARNING: Missing tag on MountingHole instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:258.
+WARNING: Random tag eVWkc8l1C4 generated for MountingHole.
+WARNING: Missing tag on MountingHole instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:258.
+WARNING: Random tag 1IMmXwgSzN generated for MountingHole.
+WARNING: Missing tag on MountingHole instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:258.
+WARNING: Random tag _mbq7iG5qx generated for MountingHole.
+WARNING: Missing tag on MountingHole instantiated at /workspace/PinaBioHw/scripts/generate_kicad.py:258.
+WARNING: Random tag C5ZSTzJ98D generated for MountingHole.
+WARNING: Missing tag on  instantiated at /workspace/PinaBioHw/hardware/<frozen importlib._bootstrap>:488.
+INFO: 111 warnings found while generating netlist.
+INFO: 0 errors found while generating netlist.
+

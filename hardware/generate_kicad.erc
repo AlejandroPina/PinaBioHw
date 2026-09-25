@@ -1,0 +1,11 @@
+ERC WARNING: Insufficient drive current on net V_ANALOG for pin POWER-IN pin 4/V+ of MCP6004/U3.
+ERC WARNING: Insufficient drive current on net GNDA for pin POWER-IN pin 3/GND of ADS1115IDGS/U4.
+ERC WARNING: Insufficient drive current on net GNDA for pin POWER-IN pin 11/V- of MCP6004/U3.
+ERC WARNING: Insufficient drive current on net GNDD for pin POWER-IN pin 2/GND of ADP150-3.3/U2.
+ERC WARNING: Insufficient drive current on net GNDD for pin POWER-IN pin 13/GND of XIAO_ESP32S3/U1.
+ERC WARNING: Insufficient drive current on net LDO_VIN for pin POWER-IN pin 1/VIN of ADP150-3.3/U2.
+ERC WARNING: Insufficient drive current on net +5V for pin POWER-IN pin 14/5V of XIAO_ESP32S3/U1.
+ERC WARNING: Insufficient drive current on net V_BATT for pin POWER-IN pin 15/BAT+ of XIAO_ESP32S3/U1.
+ERC INFO: 8 warnings found while running ERC.
+ERC INFO: 0 errors found while running ERC.
+
