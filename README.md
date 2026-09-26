@@ -8,14 +8,14 @@ The **paid JLCPCB order** is **v1.0** (`exports/PinaBio_v1_*`). A **v1.1 layout*
 
 **PinaBio** is a **biofeedback** board (skin conductance, pulse, temperature, ECG, breathing). It is **not a medical device** and does not diagnose anything. The nickname **Paca** is a tribute to Alejandro’s grandmother.
 
-Phone Bluetooth still advertises as **`PinaBiosensor`**. Do not change that name or the Android package `com.pinabiosensor.mini`.
+Phone Bluetooth advertises as **`PinaBiosensor`**. Keep this BLE name for firmware clients.
 
 ## What the board is
 
 One PCB, about **110 × 70 mm**, microcontroller **Seeed XIAO ESP32-S3** in a socket:
 
 - GSR (skin)
-- Pulse / HRV (MAX30102) — heart-rate math on the **phone**
+- Pulse / HRV (MAX30102) — raw PPG for external HRV analysis
 - Temperature (MAX30205)
 - ECG (AD8232 module — lab toy, not a hospital ECG)
 - Chest + abdomen breathing (stretch bands that change resistance)
@@ -52,24 +52,11 @@ Do **not** use the Mini gerbers in `exports/gerbers/PinaBiosensor_Mini-...`.
 
 Board sketch (Arduino, XIAO ESP32-S3):
 
-`firmware/PinaBiosensor_V1_Firmware_Final/PinaBiosensor_V1_Firmware_Final.ino`
+`firmware/PinaBiosensor_Firmware_v1_1/PinaBiosensor_Firmware_v1_1.ino`
 
-BLE name: `PinaBiosensor`. Protocol: `docs/13_protocolo_firmware_v1.md`. Firmware README: `firmware/README.md`. ADS scheduler: `docs/14_ads1115_scheduler_v0.2.md`.
+BLE name: `PinaBiosensor`. Current protocol: `docs/13_protocolo_firmware_v1_1.md`. Instructions: `firmware/README.md`. Changes: `firmware/CHANGELOG_v1_1.md`.
 
-Legacy JSON v3: `docs/05_protocolo_json.md`. Previous sketch: `firmware/archive/PinaBiosensor_Mini/`.
-
-```bash
-python3 protocol/validate.py
-python3 protocol/hrv_check.py
-```
-
-## Android app
-
-`android/` — BLE scan for `PinaBiosensor`, live charts (GSR, breath, ECG), HRV, battery %, breathing calibration.
-
-Test **without** the factory PCB: button **Demo en vivo**. Phone must be a real device (emulator has no BLE).
-
-PC: `pip install bleak && python3 scripts/pina_ble_watch.py`.
+Firmware debug JSON is v4. Binary frame details are in the protocol specification.
 
 ## Open the PCB in KiCad
 
@@ -91,7 +78,7 @@ Design BOM: `bom/BOM.csv`.
 
 - `docs/02_arquitectura.md` — architecture
 - `docs/04_seguridad.md` — safety (EN + ES)
-- `docs/05_protocolo_json.md` — BLE UUIDs and JSON
+- `docs/13_protocolo_firmware_v1_1.md` — BLE UUIDs and V1.1 frames
 - `docs/08_jlcpcb_order.md` — order (English)
 - `docs/08_pedido_jlcpcb.md` — pedido (español)
 - `docs/09_caja_interruptor_medidor.md` — box DPDT (4 wires) and J10

@@ -6,14 +6,13 @@
 |--------|--------|
 | Producto | PinaBio v1.0 (apodo **Paca**) |
 | Nombre BLE (no cambiar) | `PinaBiosensor` |
-| Paquete Android (no cambiar) | `com.pinabiosensor.mini` |
 | Ficheros KiCad | `hardware/PinaBiosensor_Mini.*` (el nombre Mini es histórico) |
 | Congelado de pedido | `hardware/archive/PinaBio_v1.0/` y `exports/PinaBio_v1_*` |
-| Firmware | `firmware/PinaBiosensor_V1_Firmware_Final/PinaBiosensor_V1_Firmware_Final.ino` (binario RAW + JSON legado). Protocolo: `docs/13_protocolo_firmware_v1.md` |
+| Firmware | `firmware/PinaBiosensor_Firmware_v1_1/PinaBiosensor_Firmware_v1_1.ino`. Protocolo: `docs/13_protocolo_firmware_v1_1.md` |
 | Pedido fábrica | 5 PCB + 2 PCBA, verde, 1,6 mm, 2 capas, HASL, vias tented |
 | Clasificación | Prototipo de **biofeedback / laboratorio personal**. **No es dispositivo médico.** No diagnostica. No cumple IEC 60601. |
 
-**Supuestos de este texto (no se preguntó al usuario):** idioma español; base = **v1.0 soldada**, no el layout RF v1.1; firmware = el `.ino` del repo con `DEMO_BLE=0`; BOM “pedido real” = lo que JLCPCB emparejó en DFM (puede diferir 0,1 % vs 1 % en R3/R4 respecto al CSV del repo).
+**Supuestos de este texto (no se preguntó al usuario):** idioma español; base = **v1.0 soldada**, no el layout RF v1.1; firmware = V1.1 del repo; BOM “pedido real” = lo que JLCPCB emparejó en DFM (puede diferir 0,1 % vs 1 % en R3/R4 respecto al CSV del repo).
 
 ---
 
@@ -28,7 +27,7 @@ La placa lee:
 5. Dos bandas elásticas resistivas (tórax y abdomen).
 6. Tensión de una LiPo 1S (el % lo calcula el teléfono).
 
-El firmware **no** calcula HRV (RMSSD, SDNN, LF/HF). Detecta intervalos RR toscos y los manda. El móvil hace el resto y calibra la “profundidad” de respiración como % de un ensayo de ~20 s, **no** litros de aire.
+El firmware **no** calcula HRV (RMSSD, SDNN, LF/HF). Detecta intervalos RR preliminares y envía PPG RAW para análisis posterior por un cliente externo.
 
 **Sesión con piel:** solo Bluetooth. **Nunca** USB a un PC (masa de red / cargador) con electrodos, bandas o ECG puestos. Programar y cargar con la piel fuera.
 
@@ -283,136 +282,11 @@ GNDA y GNDD unidos en NT1: un ESD en J3 recorre el net-tie hacia el XIAO. Mejor 
 
 ---
 
-## 13. Firmware — arquitectura
+## 13. Firmware vigente — V1.1 para la PCB fabricada
 
-Firmware de placa: `firmware/PinaBiosensor_V1_Firmware_Final/PinaBiosensor_V1_Firmware_Final.ino`. El sketch JSON v3 antiguo está archivado. Arduino-ESP32, XIAO ESP32-S3.
+El sketch vigente es `firmware/PinaBiosensor_Firmware_v1_1/PinaBiosensor_Firmware_v1_1.ino`. El formato de frames, comandos y UUID se define en `docs/13_protocolo_firmware_v1_1.md`; las instrucciones y límites de verificación están en `firmware/README.md`. La adquisición utiliza un único task para ADS1115, otro para PPG, otro para telemetría lenta y uno para comunicaciones. No se usa hardware V2.
 
-Dependencias: `Wire`, `Adafruit_ADS1X15`, SparkFun `MAX30105` + `heartRate.h`, BLE stack Espressif, `driver/rtc_io.h`.
-
-`DEMO_BLE=1`: anuncia el mismo JSON **sin** I2C (sines y latidos falsos). Para Android sin PCB. En placa real: **0**.
-
-### 13.1 Constantes
-
-| Símbolo | Valor | Rol |
-|---------|-------|-----|
-| `JSON_PERIOD_MS` | 200 | Periodo de notify JSON |
-| `V_REF` | 0,50 | Coherente con divisor 56k/10k |
-| `R_SERIES` | 100 kΩ | GSR |
-| `R_BAND` | 47 kΩ | (declarado; las bandas se envían en voltios, no se convierte a ohmios en FW) |
-| `IR_FINGER_MIN` | 20 000 | Presencia de dedo |
-| `IBI_MIN/MAX_MS` | 300 / 1500 | 40–200 lpm tosco |
-| `BEAT_STALE_MS` | 2500 | HR → 0 si no hay latido |
-| `RR_Q` | 8 | Cola de IBI por paquete |
-| `ECG_N` | 8 | Muestras ECG por paquete |
-| `BLE_NAME` | `PinaBiosensor` | Advertising |
-| UUID servicio propio | `6b1d0001-5e8a-4c2f-9b3a-2c7f0e1a4d90` | |
-| UUID JSON | `6b1d0002-…4d90` | READ + NOTIFY + CCCD 2902 |
-| HR 0x180D / 0x2A37 | Polar-like | flags 0x10 = UINT8 HR + RR (1/1024 s) |
-| 0x2A38 | 3 = finger | |
-
-Bits `ok`: 1 ADS, 2 PPG, 4 TEMP, 8 FINGER, 16 SHUTDOWN.
-
-### 13.2 Pseudocódigo — arranque
-
-```
-setup:
-  SLEEP_N = INPUT_PULLUP
-  LOP, LON = INPUT
-  ADC 12 bit
-  Serial 115200
-  I2C 400 kHz
-  si DEMO: adsOk=ppgOk=tempOk=true
-  si no:
-    ads.begin(0x49); gain ×8; 860 SPS
-    ppg.begin(0x57); setup(led, avg, mode, 100 sps, pw 411, adc 4096)
-    IR amp 0x1F, red 0x0A, green 0
-    tempOk = ping(0x48)
-  attachInterrupt(D3, FALLING, onSleepIsr)
-  sampleSlowSensors()
-  BLE init nombre PinaBiosensor, MTU 247
-  anunciar servicio JSON + 0x180D
-```
-
-### 13.3 Pseudocódigo — bucle
-
-```
-loop:
-  si ppgOk:
-    ir = MAX30102 IR
-    si ir < umbral: si stale → hr=0
-    si checkForBeat(ir):   // SparkFun, no clínico
-      ibi = now - lastBeat
-      si 300 ≤ ibi ≤ 1500:
-        encolar ibi
-        bpm EMA 0.8/0.2
-        notify 0x2A37 (hr uint8, rr = ibi*1024/1000)
-  si no ppg: cada ~1 s ping 0x57
-
-  sampleEcg(): AIN0 ×1 → buffer mV (máx 8)
-
-  si SLEEP_N low > 40 ms (o ISR):
-    publish(ok|=SHUTDOWN)
-    BLE off
-    RTC pull-up GPIO4
-    deep sleep wake si GPIO4 = 1   // DPDT ON otra vez
-
-  cada 200 ms:
-    sampleSlowSensors()  // AIN1 GSR ×8, AIN2/3 ×1, MAX30205, Vbat
-    notify JSON v3 + Serial
-```
-
-### 13.4 Módulo GSR (firmware)
-
-Solo usa AIN1. No promedia N muestras (una conversión por periodo de 200 ms, más las del ECG en el mismo ADC). Un pico de movimiento se cuela entero.
-
-### 13.5 Módulo PPG / HR
-
-`checkForBeat()` es un detector de flanco sobre IR, no un Pan-Tompkins. Fallará con movimiento, uñas, piel oscura, LED saturado, IR de ambiente. Los IBI fuera de 300–1500 ms se tiran (no hay interpolación). El teléfono debe tratar `hr` y `rr_ms` como **indicativos**.
-
-### 13.6 Módulo temperatura
-
-Lectura cruda MAX30205 cada 200 ms si el chip responde. Sin filtro, sin timeout largo, sin registro de configuración (modo por defecto). Contacto térmico = el módulo colgando de un cable: error de varios décimas a grados.
-
-### 13.7 Módulo ECG (firmware)
-
-Submuestreo grave. Sin 50/60 Hz. `lo` es digital del AD8232, no análisis de señal. Mezclar ECG de juguete con GSR en el mismo ADS multiplexado **modula** el GSR cada vez que se cambia el mux/ganancia (inyección de carga). No medido en lab; riesgo real.
-
-### 13.8 Módulo respiración (firmware)
-
-Pasa voltios crudos. Toda la inteligencia está en Android (min/max). Si el usuario no calibra, las gráficas no significan “% respiración”.
-
-### 13.9 Módulo batería y sleep
-
-Vbat cada 200 ms. Sleep: GPIO4 a 0 durante >40 ms. No apaga el LDO por software (eso es el DPDT). Si el usuario deja el DPDT en ON y resetea el MCU, el analógico sigue. Deep sleep **no** corta `+3V3` de los MAX: el XIAO en sleep sí baja mucho, pero un USB metido mantiene 3V3 y los MAX encendidos.
-
-No hay watchdog. Un cuelgue de I2C deja de notificar sin reset.
-
-### 13.10 BLE JSON v3
-
-Ejemplo:
-
-```json
-{"v":3,"ms":12345,"gsr_uS":8.42,"t_c":33.16,"hr":72,"rr_ms":[833],"ir":87421,"batt_v":3.87,"ok":15,"lo":0,"rt_v":0.182,"ra_v":0.165,"ecg_mv":[1650,1662,1640]}
-```
-
-| Clave | Unidad / semántica |
-|-------|-------------------|
-| `v` | 3 |
-| `ms` | `millis()` desde boot (se pierde en deep sleep) |
-| `gsr_uS` | microsiemens estimados |
-| `t_c` | °C MAX30205 |
-| `hr` | lpm suavizado o 0 |
-| `rr_ms` | array IBI nuevos desde el último JSON; se **vacía** al publicar |
-| `ir` | cuentas IR |
-| `batt_v` | voltios LiPo estimados |
-| `ok` | bitmask |
-| `lo` | 0/1 leads-off |
-| `rt_v` `ra_v` | voltios ADC bandas |
-| `ecg_mv` | array mV ADC; se vacía al publicar |
-
-**No hay CRC, secuencia, ni cifrado.** Cualquiera en BLE puede leer el notify si no hay bonding (el código no configura bonding). MTU 247: un JSON de ~300 B cabe; si el móvil no negocia MTU, riesgo de corte (Android del repo tiene fallback).
-
-Al desconectar: `startAdvertising()` otra vez.
+El firmware conserva `PinaBiosensor`, ECG y PPG RAW, telemetría, eventos y HRS. JSON v4 es solo depuración.
 
 ---
 
@@ -452,7 +326,7 @@ Esto es lo que un revisor debe atacar. Varios fallos son **nuestros**, no del us
 
 2. **ESD incompleta.** TVS solo en tres bornes de goma/piel. Faltan: I2C J4/J5 (TVS 3,3 V + 22–47 Ω serie), `SLEEP_N`, `ECG_OUT`/`LO±` en J8 o en el propio AD8232, TVS de 5,5–6 V en `V_BATT`. Clasificación 61000-4-2 contacto 8 kV como **objetivo de prototipo**, no de certificado.
 
-3. **ECG y GSR en el mismo ADS multiplexado** + JSON 5 Hz + 8 muestras. O un segundo ADC / AFE para ECG, o quitar el ECG de esta placa y dejar el AD8232 en un canal dedicado (SPI AFE). Mientras tanto: **no llamar ECG** en la app; “forma de onda de laboratorio”.
+3. **ECG y GSR en el mismo ADS multiplexado** + JSON 5 Hz + 8 muestras. O un segundo ADC / AFE para ECG, o quitar el ECG de esta placa y dejar el AD8232 en un canal dedicado (SPI AFE). Mientras tanto, describir el ECG como “forma de onda de laboratorio”.
 
 4. **Antena v1.0.** Cobre bajo el XIAO. Uso: cable U.FL fuera. Próximo PCB: USB en un borde **y** U.FL/antena en un recorte **sin cobre** en todas las capas (el v1.1 actual solo vacía bajo el USB: **insuficiente**).
 
@@ -500,7 +374,7 @@ Esto es lo que un revisor debe atacar. Varios fallos son **nuestros**, no del us
 - ADDR ADS a VDD (0x49) vs temp 0x48.
 - TVS en los tres bornes de piel/goma (aunque no baste).
 - DPDT que **no** corta carga si se cablea como §3.
-- JSON v3 + 0x180D para el móvil que ya existe.
+- Protocolo binario V1.1 + 0x180D.
 - Contorno 110×70 real en Gerber de producción.
 
 ---
@@ -511,7 +385,7 @@ No incluye:
 
 - Pasos KiCad para Grok (mover XIAO, keepout U.FL, re-anclar conectores). Eso es el **siguiente** encargo, con esta spec como contrato.
 - Esquemático dibujado (está en `hardware/archive/PinaBio_v1.0/PinaBiosensor_Mini.kicad_sch`).
-- App Android / script PC (`android/`, `scripts/pina_ble_watch.py`).
+- Los clientes BLE externos deberán interpretar el protocolo V1.1.
 
 ---
 

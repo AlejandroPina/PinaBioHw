@@ -31,4 +31,4 @@ AD8232 SDN unido a V_ANALOG: con SW1 OFF se apaga el ECG junto al analógico. LO
 
 ## BLE
 
-Nombre BLE `PinaBiosensor` (no es el nombre de marketing). JSON v3 + servicio de pulso 0x180D.
+Nombre BLE `PinaBiosensor` (no es el nombre de marketing). Protocolo binario V1.1 + servicio de pulso 0x180D. JSON v4 opcional para depuración.

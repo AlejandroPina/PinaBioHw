@@ -157,4 +157,4 @@ Cart: **5** PCBs, **2** assembled, green, 1.6 mm. Ship to your address, pay.
 7. Battery **only** with protection, on **J1**, correct polarity. **Never** USB and skin together.
 8. Skin session: **Bluetooth only**, computer USB **out**.
 
-Firmware and the app are a later step. This order only builds **PinaBio v1.0** hardware.
+This order only builds **PinaBio v1.0** hardware. The current firmware is documented separately in `firmware/`.

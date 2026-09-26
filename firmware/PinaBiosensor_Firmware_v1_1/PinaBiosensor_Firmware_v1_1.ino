@@ -1,5 +1,5 @@
 /*
- * PinaBiosensor V1 - engineered firmware
+ * PinaBiosensor Firmware v1.1 for fabricated PinaBio Paca v1.0
  * Target: Seeed Studio XIAO ESP32-S3
  *
  * Hardware fixed by fabricated V1 PCB:
@@ -33,6 +33,7 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 #include <Preferences.h>
+#include <WiFi.h>
 #include "driver/rtc_io.h"
 #include "esp_sleep.h"
 #include "esp_timer.h"
@@ -40,7 +41,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <strings.h>
-#include <string>
+
 
 // ----------------------------------------------------------------------
 // Hardware
@@ -93,19 +94,19 @@ static constexpr uint32_t PPG_POLL_MS           = 3;
 // ----------------------------------------------------------------------
 // Binary protocol
 // ----------------------------------------------------------------------
-// Header (12 bytes):
+// Header (13 bytes):
 //   0 magic 0xA5
 //   1 type (1=ECG, 2=PPG, 3=TELEMETRY, 4=EVENT)
-//   2 version = 1
+//   2 version = 0x11
 //   3 flags
 //   4..5 sequence LE
-//   6..9 first timestamp, ms from boot LE
+//   6..9 first timestamp, microseconds from START modulo 2^32 LE
 //   10..11 nominal/estimated sample period, us LE
 //   12 sample count
-// Payload follows. CRC16-CCITT is last 2 bytes.
+// Payload follows. CRC16-CCITT-FALSE is last 2 bytes.
 // ECG sample: int16 raw, LE.
 // PPG sample: uint24 IR + uint24 RED, LE (18-bit source packed into 24 bits).
-static constexpr uint8_t PROTOCOL_VERSION = 1;
+static constexpr uint8_t PROTOCOL_VERSION = 0x11; // V1.1; layout V1
 static constexpr uint8_t PACKET_MAGIC     = 0xA5;
 static constexpr uint16_t DEFAULT_ATT_MTU  = 23;
 
@@ -118,17 +119,17 @@ enum RunState : uint8_t { STATE_STOPPED = 0, STATE_RUNNING = 1 };
 
 struct ESample {
   int16_t raw;
-  uint32_t tsUs; // microseconds since session start, wraps after ~71.6 min
+  uint64_t tsUs; // monotonic microseconds, absolute until serialization
 };
 
 struct PSample {
   uint32_t ir;
   uint32_t red;
-  uint32_t tsUs; // microseconds since session start, wraps after ~71.6 min
+  uint64_t tsUs; // monotonic microseconds, absolute until serialization
 };
 
 struct SlowSample {
-  uint32_t tsUs;
+  uint64_t tsUs;
   float gsrUs;
   float thoraxV;
   float abdomenV;
@@ -146,7 +147,7 @@ struct CmdMsg {
   char text[128];
 };
 
-enum GainMode : uint8_t { GAINMODE_ONE = 0, GAINMODE_EIGHT = 1 };
+enum GainMode : uint8_t { GAINMODE_ONE = 0, GAINMODE_0512 = 1 };
 
 struct AdcSlot {
   uint64_t nextDueUs;
@@ -171,6 +172,12 @@ BLECharacteristic *chHr = nullptr;
 
 SemaphoreHandle_t i2cMutex = nullptr;
 SemaphoreHandle_t bleMutex = nullptr;
+SemaphoreHandle_t stateMutex = nullptr;
+struct StateGuard {
+  bool held;
+  StateGuard() : held(stateMutex && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {}
+  ~StateGuard() { if (held) xSemaphoreGive(stateMutex); }
+};
 QueueHandle_t cmdQueue = nullptr;
 
 TaskHandle_t adcTaskHandle = nullptr;
@@ -186,6 +193,19 @@ portMUX_TYPE telMux = portMUX_INITIALIZER_UNLOCKED;
 volatile bool bleConnected = false;
 volatile bool sleepRequested = false;
 volatile bool deepSleeping = false;
+volatile bool commsParked = false;
+uint32_t sessionGeneration = 1;
+bool usbBinaryMode = false;
+uint32_t ppgFifoOverflow = 0;
+uint32_t ppgSoftwareOverflow = 0;
+uint8_t ppgOverflowPrev = 0;
+uint32_t ppgI2cErrors = 0;
+uint32_t tempI2cErrors = 0;
+uint32_t framesGenerated = 0;
+uint32_t framesAccepted = 0;
+uint32_t usbFrames = 0;
+float measuredAdcSps[4] = {0, 0, 0, 0};
+float measuredPpgSps = 0;
 
 RunState runState = STATE_RUNNING;
 
@@ -205,7 +225,7 @@ bool txUsb = true;
 bool txBle = true;
 bool usbEcgStream = false;
 bool usbPpgStream = false;
-bool autoEcgBoost = true;
+bool autoEcgBoost = false;
 
 uint16_t ecgRateCfg = ECG_RATE_DEFAULT;
 uint16_t ppgRateCfg = PPG_RATE_DEFAULT;
@@ -265,6 +285,7 @@ bool configDirty = false;
 static constexpr size_t ECG_RING_CAP = 2048;
 static constexpr size_t PPG_RING_CAP = 1024;
 static constexpr size_t TEL_RING_CAP = 64;
+static void printDiagnostics();
 
 ESample ecgRing[ECG_RING_CAP];
 size_t ecgHead = 0, ecgTail = 0;
@@ -280,9 +301,8 @@ static uint32_t nowMs() {
   return (uint32_t)(esp_timer_get_time() / 1000ULL);
 }
 
-static uint32_t sessionUs32() {
-  return (uint32_t)((uint64_t)esp_timer_get_time() - sessionStartUs);
-}
+static uint64_t clockUs() { return (uint64_t)esp_timer_get_time(); }
+static uint32_t wireTime(uint64_t absoluteUs) { return (uint32_t)(absoluteUs - sessionStartUs); }
 
 static uint16_t clampU16(long v) {
   if (v < 0) return 0;
@@ -329,7 +349,7 @@ static float adsRawToVolts(int16_t raw, GainMode gain) {
   float fsr = 4.096f;
   switch (gain) {
     case GAINMODE_ONE:   fsr = 4.096f; break;
-    case GAINMODE_EIGHT: fsr = 0.512f; break;
+    case GAINMODE_0512: fsr = 0.512f; break;
     default:             fsr = 4.096f; break;
   }
   return ((float)raw * fsr) / 32768.0f;
@@ -354,10 +374,9 @@ static uint16_t adcTotalBudget() {
       if (enGsr) slow += gsrRateCfg;
       if (enThorax) slow += thoraxRateCfg;
       if (enAbdomen) slow += abdomenRateCfg;
-      uint32_t headroom = (slow < ADC_BUDGET_SPS) ? (ADC_BUDGET_SPS - slow) : ECG_RATE_DEFAULT;
+      uint32_t headroom = (slow < ADC_BUDGET_SPS) ? (ADC_BUDGET_SPS - slow) : 0;
       if (headroom > ECG_RATE_MAX) headroom = ECG_RATE_MAX;
-      if (headroom < ECG_RATE_DEFAULT) headroom = ECG_RATE_DEFAULT;
-      ecgEff = (uint16_t)headroom;
+      if (headroom > ecgRateCfg) ecgEff = (uint16_t)headroom;
     }
     total += ecgEff;
   }
@@ -374,8 +393,8 @@ static uint16_t effectiveEcgRate() {
   if (enGsr) slow += gsrRateCfg;
   if (enThorax) slow += thoraxRateCfg;
   if (enAbdomen) slow += abdomenRateCfg;
-  uint32_t headroom = (slow < ADC_BUDGET_SPS) ? (ADC_BUDGET_SPS - slow) : ECG_RATE_DEFAULT;
-  if (headroom < ECG_RATE_DEFAULT) headroom = ECG_RATE_DEFAULT;
+  uint32_t headroom = (slow < ADC_BUDGET_SPS) ? (ADC_BUDGET_SPS - slow) : 0;
+  if (headroom < ecgRateCfg) headroom = ecgRateCfg;
   if (headroom > ECG_RATE_MAX) headroom = ECG_RATE_MAX;
   return (uint16_t)headroom;
 }
@@ -398,37 +417,43 @@ static uint16_t targetRate(AdcChan c) {
 }
 
 static GainMode gainFor(AdcChan c) {
-  return (c == CH_GSR) ? GAINMODE_EIGHT : GAINMODE_ONE;
+  return (c == CH_GSR) ? GAINMODE_0512 : GAINMODE_ONE;
 }
 
 // ----------------------------------------------------------------------
 // Ring buffers
 // ----------------------------------------------------------------------
 static bool ecgPush(const ESample &s) {
-  bool overwritten = false;
+  bool accepted = false;
   portENTER_CRITICAL(&ecgMux);
   size_t next = (ecgHead + 1) % ECG_RING_CAP;
   if (next == ecgTail) {
-    ecgTail = (ecgTail + 1) % ECG_RING_CAP;
     ecgDrops++;
-    overwritten = true;
+  } else {
+    ecgRing[ecgHead] = s;
+    ecgHead = next;
+    accepted = true;
   }
-  ecgRing[ecgHead] = s;
-  ecgHead = next;
   portEXIT_CRITICAL(&ecgMux);
-  return !overwritten;
+  return accepted;
 }
 
-static bool ecgPop(ESample &s) {
-  bool ok = false;
+static size_t ecgPeek(ESample *out, size_t limit) {
+  size_t n = 0;
   portENTER_CRITICAL(&ecgMux);
-  if (ecgTail != ecgHead) {
-    s = ecgRing[ecgTail];
-    ecgTail = (ecgTail + 1) % ECG_RING_CAP;
-    ok = true;
+  size_t i = ecgTail;
+  while (i != ecgHead && n < limit) {
+    out[n++] = ecgRing[i];
+    i = (i + 1) % ECG_RING_CAP;
   }
   portEXIT_CRITICAL(&ecgMux);
-  return ok;
+  return n;
+}
+
+static void ecgDiscard(size_t n) {
+  portENTER_CRITICAL(&ecgMux);
+  while (n-- && ecgTail != ecgHead) ecgTail = (ecgTail + 1) % ECG_RING_CAP;
+  portEXIT_CRITICAL(&ecgMux);
 }
 
 static size_t ecgCount() {
@@ -440,30 +465,36 @@ static size_t ecgCount() {
 }
 
 static bool ppgPush(const PSample &s) {
-  bool overwritten = false;
+  bool accepted = false;
   portENTER_CRITICAL(&ppgMux);
   size_t next = (ppgHead + 1) % PPG_RING_CAP;
   if (next == ppgTail) {
-    ppgTail = (ppgTail + 1) % PPG_RING_CAP;
     ppgDrops++;
-    overwritten = true;
+  } else {
+    ppgRing[ppgHead] = s;
+    ppgHead = next;
+    accepted = true;
   }
-  ppgRing[ppgHead] = s;
-  ppgHead = next;
   portEXIT_CRITICAL(&ppgMux);
-  return !overwritten;
+  return accepted;
 }
 
-static bool ppgPop(PSample &s) {
-  bool ok = false;
+static size_t ppgPeek(PSample *out, size_t limit) {
+  size_t n = 0;
   portENTER_CRITICAL(&ppgMux);
-  if (ppgTail != ppgHead) {
-    s = ppgRing[ppgTail];
-    ppgTail = (ppgTail + 1) % PPG_RING_CAP;
-    ok = true;
+  size_t i = ppgTail;
+  while (i != ppgHead && n < limit) {
+    out[n++] = ppgRing[i];
+    i = (i + 1) % PPG_RING_CAP;
   }
   portEXIT_CRITICAL(&ppgMux);
-  return ok;
+  return n;
+}
+
+static void ppgDiscard(size_t n) {
+  portENTER_CRITICAL(&ppgMux);
+  while (n-- && ppgTail != ppgHead) ppgTail = (ppgTail + 1) % PPG_RING_CAP;
+  portEXIT_CRITICAL(&ppgMux);
 }
 
 static size_t ppgCount() {
@@ -531,7 +562,7 @@ static constexpr uint16_t ADS_REG_CONFIG     = 0x01;
 static constexpr uint16_t ADS_OS_START       = 0x8000;
 static constexpr uint16_t ADS_MUX_BASE       = 0x4000;
 static constexpr uint16_t ADS_PGA_ONE        = 0x0200;
-static constexpr uint16_t ADS_PGA_EIGHT      = 0x0400;
+static constexpr uint16_t ADS_PGA_0512       = 0x0800;
 static constexpr uint16_t ADS_MODE_SINGLE    = 0x0100;
 static constexpr uint16_t ADS_DR_860         = 0x00E0;
 static constexpr uint16_t ADS_CQUE_DISABLE   = 0x0003;
@@ -571,10 +602,10 @@ static uint16_t adsMuxBits(AdcChan c) {
 }
 
 static uint16_t adsGainBits(GainMode g) {
-  return (g == GAINMODE_EIGHT) ? ADS_PGA_EIGHT : ADS_PGA_ONE;
+  return (g == GAINMODE_0512) ? ADS_PGA_0512 : ADS_PGA_ONE;
 }
 
-static bool adsStartAndRead(AdcChan c, int16_t &raw, uint32_t &tsUs) {
+static bool adsStartAndRead(AdcChan c, int16_t &raw, uint64_t &tsUs) {
   GainMode gain = gainFor(c);
   uint16_t cfg = ADS_OS_START | adsMuxBits(c) | adsGainBits(gain) |
                  ADS_MODE_SINGLE | ADS_DR_860 | ADS_CQUE_DISABLE;
@@ -582,17 +613,19 @@ static bool adsStartAndRead(AdcChan c, int16_t &raw, uint32_t &tsUs) {
   if (!adsWriteConfig(cfg)) return false;
 
   uint32_t startUs = (uint32_t)esp_timer_get_time();
+  bool ready = false;
   while ((uint32_t)(esp_timer_get_time() - startUs) < ADS_CONV_TIMEOUT_US) {
     uint16_t cval = 0;
     if (!adsReadReg16(ADS_REG_CONFIG, cval)) return false;
-    if (cval & ADS_OS_START) break;
+    if (cval & ADS_OS_START) { ready = true; break; }
     vTaskDelay(1);
   }
 
+  if (!ready) return false;
   uint16_t raw16 = 0;
   if (!adsReadReg16(ADS_REG_CONVERSION, raw16)) return false;
   raw = (int16_t)raw16;
-  tsUs = sessionUs32();
+  tsUs = clockUs();
   return true;
 }
 
@@ -611,6 +644,8 @@ static AdcSlot adcSlots[4];
 static volatile bool adcScheduleDirty = true;
 
 static void rebuildAdcSchedule() {
+  StateGuard guard;
+  if (!guard.held) return;
   uint64_t t = (uint64_t)esp_timer_get_time();
   for (uint8_t i = 0; i < 4; ++i) {
     AdcChan c = (AdcChan)i;
@@ -622,7 +657,11 @@ static void rebuildAdcSchedule() {
 }
 
 static AdcChan pickNextAdcChannel(uint64_t nowUs) {
-  if (adcScheduleDirty) rebuildAdcSchedule();
+  bool dirty;
+  { StateGuard guard; dirty = guard.held && adcScheduleDirty; }
+  if (dirty) rebuildAdcSchedule();
+  StateGuard guard;
+  if (!guard.held) return CH_NONE;
   AdcChan best = CH_NONE;
   uint64_t bestDue = UINT64_MAX;
   for (uint8_t i = 0; i < 4; ++i) {
@@ -636,6 +675,9 @@ static AdcChan pickNextAdcChannel(uint64_t nowUs) {
     }
   }
   if (best == CH_NONE) return CH_NONE;
+  // Release before waiting for a due time or performing I2C.
+  xSemaphoreGive(stateMutex);
+  guard.held = false;
   if (bestDue > nowUs) {
     uint64_t waitUs = bestDue - nowUs;
     if (waitUs > 1500) {
@@ -647,7 +689,7 @@ static AdcChan pickNextAdcChannel(uint64_t nowUs) {
   return best;
 }
 
-static void processAdcSample(AdcChan c, int16_t raw, uint32_t tsUs) {
+static void processAdcSample(AdcChan c, int16_t raw, uint64_t tsUs) {
   const uint8_t idx = (uint8_t)c;
   const GainMode gain = gainFor(c);
   const float v = adsRawToVolts(raw, gain);
@@ -670,7 +712,14 @@ static void adcTask(void *arg) {
   rebuildAdcSchedule();
 
   for (;;) {
-    if (runState != STATE_RUNNING || !adsOk || deepSleeping) {
+    uint32_t generation;
+    bool active;
+    {
+      StateGuard guard;
+      generation = sessionGeneration;
+      active = guard.held && runState == STATE_RUNNING && adsOk && !deepSleeping;
+    }
+    if (!active) {
       vTaskDelay(pdMS_TO_TICKS(10));
       continue;
     }
@@ -691,15 +740,22 @@ static void adcTask(void *arg) {
     }
 
     int16_t raw = 0;
-    uint32_t ts = 0;
+    uint64_t ts = 0;
     if (adsStartAndRead(c, raw, ts)) {
-      adcConversions++;
-      processAdcSample(c, raw, ts);
+      StateGuard guard;
+      if (guard.held && generation == sessionGeneration && runState == STATE_RUNNING && !deepSleeping) {
+        adcConversions++;
+        processAdcSample(c, raw, ts);
+      }
     } else {
       adcErrors[idx]++;
     }
 
-    const uint16_t rate = targetRate(c);
+    uint16_t rate;
+    {
+      StateGuard guard;
+      rate = guard.held ? targetRate(c) : 0;
+    }
     if (rate == 0) {
       adcSlots[idx].nextDueUs = UINT64_MAX;
       continue;
@@ -751,6 +807,7 @@ static bool configurePpg(uint16_t rate) {
   ppg.setFIFOAverage(1);
   ppg.enableFIFORollover();
   ppg.clearFIFO();
+  ppgOverflowPrev = 0;
   xSemaphoreGive(i2cMutex);
   ppgRateCfg = rate;
   return true;
@@ -797,7 +854,13 @@ static void ppgTask(void *arg) {
   uint32_t lastPoll = 0;
 
   for (;;) {
-    bool want = (runState == STATE_RUNNING && enPpg && ppgOk && !deepSleeping);
+    uint32_t generation;
+    bool want;
+    {
+      StateGuard guard;
+      generation = sessionGeneration;
+      want = guard.held && runState == STATE_RUNNING && enPpg && ppgOk && !deepSleeping;
+    }
     if (!want) {
       if (hwOn) {
         ppgHardware(false);
@@ -826,24 +889,43 @@ static void ppgTask(void *arg) {
       continue;
     }
 
+    // The 5-bit hardware counter may saturate; this is a detected lower bound.
+    Wire.beginTransmission(PPG_ADDR);
+    Wire.write((uint8_t)0x05);
+    if (Wire.endTransmission(false) == 0 && Wire.requestFrom((int)PPG_ADDR, 1, true) == 1) {
+      uint8_t current = (uint8_t)Wire.read() & 0x1F;
+      if (current >= ppgOverflowPrev) ppgFifoOverflow += current - ppgOverflowPrev;
+      ppgOverflowPrev = current;
+    } else {
+      ppgI2cErrors++;
+    }
     uint16_t newSamples = ppg.check();
     uint8_t count = ppg.available();
-    if (newSamples > 0 && count > 0) {
-      uint32_t now = sessionUs32();
+    if (newSamples > count) ppgSoftwareOverflow += newSamples - count;
+    PSample batch[32];
+    uint8_t batchCount = 0;
+    if (count > 0) {
+      uint64_t now = clockUs();
       uint32_t periodUs = 1000000UL / (uint32_t)ppgRateCfg;
-      uint32_t oldest = now - (uint32_t)(count - 1U) * periodUs;
+      uint64_t oldest = now - (uint64_t)(count - 1U) * periodUs;
 
       for (uint8_t i = 0; i < count; ++i) {
         uint32_t ir = ppg.getFIFOIR();
         uint32_t red = ppg.getFIFORed();
-        uint32_t ts = oldest + (uint32_t)i * periodUs;
-        ppgPush({ir, red, ts});
-        ppgSamples++;
-        processPpgBeat(ir, ts / 1000UL);
+        uint64_t ts = oldest + (uint64_t)i * periodUs;
+        if (batchCount < 32) batch[batchCount++] = {ir, red, ts};
         ppg.nextSample();
       }
     }
     xSemaphoreGive(i2cMutex);
+    StateGuard guard;
+    if (guard.held && generation == sessionGeneration && runState == STATE_RUNNING && !deepSleeping) {
+      for (uint8_t i = 0; i < batchCount; ++i) {
+        ppgPush(batch[i]);
+        ppgSamples++;
+        processPpgBeat(batch[i].ir, (uint32_t)(batch[i].tsUs / 1000ULL));
+      }
+    }
   }
 }
 
@@ -857,7 +939,17 @@ static void slowTask(void *arg) {
   uint32_t lastBatt = 0;
 
   for (;;) {
-    if (runState != STATE_RUNNING || deepSleeping) {
+    uint32_t generation;
+    bool active;
+    bool wantTemp, wantBatt;
+    {
+      StateGuard guard;
+      generation = sessionGeneration;
+      active = guard.held && runState == STATE_RUNNING && !deepSleeping;
+      wantTemp = enTemp;
+      wantBatt = enBattery;
+    }
+    if (!active) {
       vTaskDelay(pdMS_TO_TICKS(20));
       continue;
     }
@@ -865,27 +957,38 @@ static void slowTask(void *arg) {
     uint32_t n = nowMs();
     if ((uint32_t)(n - lastSample) >= TELEMETRY_PERIOD_MS) {
       lastSample = n;
-      lastLo = (uint8_t)((digitalRead(PIN_LOP) == HIGH || digitalRead(PIN_LON) == HIGH) ? 1 : 0);
+      uint8_t lo = (uint8_t)((digitalRead(PIN_LOP) == HIGH || digitalRead(PIN_LON) == HIGH) ? 1 : 0);
+      float newTemp = lastTempC;
+      float newBatt = lastBattV;
+      bool newTempOk = tempOk;
 
-      if (enTemp && (uint32_t)(n - lastTemp) >= 500) {
+      if (wantTemp && (uint32_t)(n - lastTemp) >= 500) {
         lastTemp = n;
         float t = 0.0f;
         if (max30205Read(t)) {
-          lastTempC = t;
-          tempOk = true;
+          newTemp = t;
+          newTempOk = true;
         } else {
-          tempOk = false;
+          newTempOk = false;
+          tempI2cErrors++;
         }
       }
 
-      if (enBattery && (uint32_t)(n - lastBatt) >= 500) {
+      if (wantBatt && (uint32_t)(n - lastBatt) >= 500) {
         lastBatt = n;
         uint32_t mv = analogReadMilliVolts(PIN_VBAT);
-        lastBattV = (mv / 1000.0f) * 2.0f;
+        newBatt = (mv / 1000.0f) * 2.0f;
       }
 
-      telPush({sessionUs32(), lastGsrUs, lastThoraxV, lastAbdomenV, lastTempC, lastBattV,
-               ppgHr, ppgRrMs, lastLo, (uint8_t)adsOk, (uint8_t)ppgOk, (uint8_t)tempOk});
+      StateGuard guard;
+      if (guard.held && generation == sessionGeneration && runState == STATE_RUNNING && !deepSleeping) {
+        lastLo = lo;
+        lastTempC = newTemp;
+        lastBattV = newBatt;
+        tempOk = newTempOk;
+        telPush({clockUs(), lastGsrUs, lastThoraxV, lastAbdomenV, lastTempC, lastBattV,
+                 ppgHr, ppgRrMs, lastLo, (uint8_t)adsOk, (uint8_t)ppgOk, (uint8_t)tempOk});
+      }
     }
     vTaskDelay(pdMS_TO_TICKS(5));
   }
@@ -926,41 +1029,49 @@ static bool bleNotify(BLECharacteristic *ch, const uint8_t *data, size_t len) {
 
 static void bleText(BLECharacteristic *ch, const char *txt) {
   if (!ch || !bleConnected || !txBle) return;
-  size_t n = strlen(txt);
+  size_t remaining = strlen(txt);
   uint16_t maxLen = bleValueMax();
-  if (n > maxLen) n = maxLen;
+  if (maxLen == 0) return;
   if (!bleMutex || xSemaphoreTake(bleMutex, pdMS_TO_TICKS(10)) != pdTRUE) return;
-  ch->setValue((uint8_t *)txt, n);
-  ch->notify();
+  while (remaining) {
+    size_t n = remaining < maxLen ? remaining : maxLen;
+    ch->setValue((uint8_t *)txt, n);
+    ch->notify();
+    txt += n;
+    remaining -= n;
+  }
   xSemaphoreGive(bleMutex);
 }
 
 static void sendResponse(const char *txt) {
-  if (txUsb) Serial.println(txt);
+  if (txUsb && !usbBinaryMode) Serial.println(txt);
   bleText(chCmd, txt);
 }
 
 static void sendEvent(const char *txt) {
-  if (txUsb) {
+  if (txUsb && !usbBinaryMode) {
     Serial.print("EV ");
     Serial.println(txt);
   }
   uint8_t frame[80];
   size_t textLen = strlen(txt);
   if (textLen > 50) textLen = 50;
-  const size_t len = 12 + textLen + 2;
+  const size_t len = 13 + textLen + 2;
   frame[0] = PACKET_MAGIC;
   frame[1] = 4;
   frame[2] = PROTOCOL_VERSION;
   frame[3] = 0;
-  putU16(&frame[4], evtSeq++);
-  putU32(&frame[6], sessionUs32());
+  putU16(&frame[4], evtSeq);
+  putU32(&frame[6], wireTime(clockUs()));
   putU16(&frame[10], 0);
   frame[12] = (uint8_t)textLen;
   memcpy(&frame[13], txt, textLen);
   uint16_t crc = crc16ccitt(frame, len - 2);
   putU16(&frame[len - 2], crc);
-  if (bleNotify(chEvt, frame, len)) eventPackets++;
+  framesGenerated++;
+  bool accepted = bleNotify(chEvt, frame, len);
+  if (usbBinaryMode && txUsb && Serial.write(frame, len) == len) { accepted = true; usbFrames++; }
+  if (accepted) { eventPackets++; evtSeq++; framesAccepted++; }
 }
 
 // ----------------------------------------------------------------------
@@ -968,32 +1079,32 @@ static void sendEvent(const char *txt) {
 // ----------------------------------------------------------------------
 static bool sendEcgFrame() {
   const bool wantBle = streamEcg && bleConnected && txBle;
-  const bool wantUsb = streamEcg && txUsb && usbEcgStream;
+  const bool wantUsb = streamEcg && txUsb && usbBinaryMode && usbEcgStream;
   if (!streamEcg || (!wantBle && !wantUsb)) return false;
   const uint16_t maxLen = wantBle ? bleValueMax() : 252;
-  if (maxLen < 14) return false;
+  if (maxLen < 17) return false;
 
-  uint8_t maxSamples = (uint8_t)((maxLen - 14) / 2); // 12 hdr + 2 CRC
+  uint8_t maxSamples = (uint8_t)((maxLen - 15) / 2); // 13 header + 2 CRC
   if (maxSamples > 80) maxSamples = 80;
   if (maxSamples < 1) return false;
-  if (ecgCount() < maxSamples) return false;
+  if (ecgCount() == 0) return false;
+  if (ecgCount() < maxSamples) maxSamples = (uint8_t)ecgCount();
 
   ESample samples[80];
-  for (uint8_t i = 0; i < maxSamples; ++i) {
-    if (!ecgPop(samples[i])) return false;
-  }
+  maxSamples = (uint8_t)ecgPeek(samples, maxSamples);
+  if (!maxSamples) return false;
 
   uint8_t frame[256];
   frame[0] = PACKET_MAGIC;
   frame[1] = 1;
   frame[2] = PROTOCOL_VERSION;
   frame[3] = 0;
-  putU16(&frame[4], ecgSeq++);
-  putU32(&frame[6], samples[0].tsUs);
+  putU16(&frame[4], ecgSeq);
+  putU32(&frame[6], wireTime(samples[0].tsUs));
 
   uint32_t periodUs = 1000000UL / (uint32_t)((effectiveEcgRate() > 0) ? effectiveEcgRate() : ECG_RATE_DEFAULT);
   if (maxSamples > 1) {
-    uint32_t dtUs = samples[maxSamples - 1].tsUs - samples[0].tsUs;
+    uint64_t dtUs = samples[maxSamples - 1].tsUs - samples[0].tsUs;
     if (dtUs > 0) {
       periodUs = (uint32_t)((uint64_t)dtUs / (uint64_t)(maxSamples - 1U));
     }
@@ -1009,45 +1120,48 @@ static bool sendEcgFrame() {
   const size_t len = 13 + 2U * maxSamples + 2;
   uint16_t crc = crc16ccitt(frame, len - 2);
   putU16(&frame[len - 2], crc);
+  framesGenerated++;
   bool delivered = false;
   if (wantBle) delivered = bleNotify(chEcg, frame, len) || delivered;
   if (wantUsb) {
-    Serial.write(frame, len);
-    delivered = true;
+    if (Serial.write(frame, len) == len) { delivered = true; usbFrames++; }
   }
   if (!delivered) return false;
+  ecgDiscard(maxSamples);
+  ecgSeq++;
+  framesAccepted++;
   ecgPackets++;
   return true;
 }
 
 static bool sendPpgFrame() {
   const bool wantBle = streamPpg && bleConnected && txBle;
-  const bool wantUsb = streamPpg && txUsb && usbPpgStream;
+  const bool wantUsb = streamPpg && txUsb && usbBinaryMode && usbPpgStream;
   if (!streamPpg || (!wantBle && !wantUsb)) return false;
   const uint16_t maxLen = wantBle ? bleValueMax() : 252;
-  if (maxLen < 20) return false;
+  if (maxLen < 21) return false;
 
-  uint8_t maxSamples = (uint8_t)((maxLen - 14) / 6); // 12 hdr + 2 CRC
+  uint8_t maxSamples = (uint8_t)((maxLen - 15) / 6); // 13 header + 2 CRC
   if (maxSamples > 30) maxSamples = 30;
   if (maxSamples < 1) return false;
-  if (ppgCount() < maxSamples) return false;
+  if (ppgCount() == 0) return false;
+  if (ppgCount() < maxSamples) maxSamples = (uint8_t)ppgCount();
 
   PSample samples[30];
-  for (uint8_t i = 0; i < maxSamples; ++i) {
-    if (!ppgPop(samples[i])) return false;
-  }
+  maxSamples = (uint8_t)ppgPeek(samples, maxSamples);
+  if (!maxSamples) return false;
 
   uint8_t frame[256];
   frame[0] = PACKET_MAGIC;
   frame[1] = 2;
   frame[2] = PROTOCOL_VERSION;
   frame[3] = 0;
-  putU16(&frame[4], ppgSeq++);
-  putU32(&frame[6], samples[0].tsUs);
+  putU16(&frame[4], ppgSeq);
+  putU32(&frame[6], wireTime(samples[0].tsUs));
 
   uint32_t periodUs = 1000000UL / (uint32_t)((ppgRateCfg > 0) ? ppgRateCfg : PPG_RATE_DEFAULT);
   if (maxSamples > 1) {
-    uint32_t dtUs = samples[maxSamples - 1].tsUs - samples[0].tsUs;
+    uint64_t dtUs = samples[maxSamples - 1].tsUs - samples[0].tsUs;
     if (dtUs > 0) periodUs = (uint32_t)((uint64_t)dtUs / (uint64_t)(maxSamples - 1U));
   }
   if (periodUs > 65535UL) periodUs = 65535UL;
@@ -1063,30 +1177,35 @@ static bool sendPpgFrame() {
   const size_t len = 13 + 6U * maxSamples + 2;
   uint16_t crc = crc16ccitt(frame, len - 2);
   putU16(&frame[len - 2], crc);
+  framesGenerated++;
   bool delivered = false;
   if (wantBle) delivered = bleNotify(chPpg, frame, len) || delivered;
   if (wantUsb) {
-    Serial.write(frame, len);
-    delivered = true;
+    if (Serial.write(frame, len) == len) { delivered = true; usbFrames++; }
   }
   if (!delivered) return false;
+  ppgDiscard(maxSamples);
+  ppgSeq++;
+  framesAccepted++;
   ppgPackets++;
   return true;
 }
 
 static bool sendTelemetryFrame(const SlowSample &s) {
-  if (!streamTelemetry || !bleConnected || !txBle) return false;
-  const size_t payloadLen = 26;
+  if (!streamTelemetry) return false;
+  const size_t payloadLen = 24;
   const size_t len = 13 + payloadLen + 2;
-  if (bleValueMax() < len) return false;
+  const bool wantBle = bleConnected && txBle && bleValueMax() >= len;
+  const bool wantUsb = txUsb && usbBinaryMode;
+  if (!wantBle && !wantUsb) return false;
 
   uint8_t frame[64];
   frame[0] = PACKET_MAGIC;
   frame[1] = 3;
   frame[2] = PROTOCOL_VERSION;
   frame[3] = 0;
-  putU16(&frame[4], telSeq++);
-  putU32(&frame[6], s.tsUs);
+  putU16(&frame[4], telSeq);
+  putU32(&frame[6], wireTime(s.tsUs));
   putU16(&frame[10], 0);
   frame[12] = 0;
 
@@ -1116,13 +1235,20 @@ static bool sendTelemetryFrame(const SlowSample &s) {
 
   uint16_t crc = crc16ccitt(frame, len - 2);
   putU16(&frame[len - 2], crc);
-  if (!bleNotify(chTel, frame, len)) return false;
+  framesGenerated++;
+  bool accepted = wantBle && bleNotify(chTel, frame, len);
+  if (wantUsb && Serial.write(frame, len) == len) { accepted = true; usbFrames++; }
+  if (!accepted) return false;
+  telSeq++;
+  framesAccepted++;
   telPackets++;
   return true;
 }
 
 static void sendLegacyJson() {
   if (!streamJson) return;
+  StateGuard guard;
+  if (!guard.held) return;
   char json[320];
   snprintf(json, sizeof(json),
            "{\"v\":4,\"ms\":%lu,\"ecg_v\":%.4f,\"gsr_uS\":%.3f,\"rt_v\":%.4f,\"ra_v\":%.4f,\"t_c\":%.2f,\"batt_v\":%.3f,\"hr\":%u,\"rr_ms\":%u,\"lo\":%u,\"ads\":%u,\"ppg\":%u,\"ecg_q\":%u,\"ppg_q\":%u}",
@@ -1130,14 +1256,15 @@ static void sendLegacyJson() {
            lastTempC, lastBattV, ppgHr, ppgRrMs, lastLo,
            (unsigned)adsOk, (unsigned)ppgOk,
            (unsigned)ecgCount(), (unsigned)ppgCount());
-  if (txUsb) Serial.println(json);
+  if (txUsb && !usbBinaryMode) Serial.println(json);
   bleText(chJson, json);
 }
 
 static void notifyHr() {
   static uint16_t lastHr = 0;
   static uint16_t lastRr = 0;
-  if (!bleConnected || !txBle || !chHr || ppgHr == 0 || ppgRrMs == 0) return;
+  StateGuard guard;
+  if (!guard.held || !bleConnected || !txBle || !chHr || ppgHr == 0 || ppgRrMs == 0) return;
   if (ppgHr == lastHr && ppgRrMs == lastRr) return;
 
   // Heart Rate Measurement Flags: bit4 = RR-Interval present;
@@ -1149,8 +1276,7 @@ static void notifyHr() {
   pkt[2] = (uint8_t)(rr1024 & 0xFFU);
   pkt[3] = (uint8_t)(rr1024 >> 8);
   // Send exactly the four bytes defined by the selected HRS flags.
-  chHr->setValue(pkt, 4);
-  chHr->notify();
+  if (!bleNotify(chHr, pkt, sizeof(pkt))) return;
   lastHr = ppgHr;
   lastRr = ppgRrMs;
 }
@@ -1179,6 +1305,14 @@ static void saveConfig() {
   prefs.putUShort("abr", abdomenRateCfg);
   prefs.putBool("auto", autoEcgBoost);
   prefs.putFloat("vref", gsrVref);
+  prefs.putBool("se", streamEcg);
+  prefs.putBool("sp", streamPpg);
+  prefs.putBool("st", streamTelemetry);
+  prefs.putBool("json", streamJson);
+  prefs.putBool("usb", txUsb);
+  prefs.putBool("ble", txBle);
+  prefs.putBool("ue", usbEcgStream);
+  prefs.putBool("up", usbPpgStream);
   prefs.end();
   configDirty = false;
 }
@@ -1197,8 +1331,16 @@ static void loadConfig() {
   gsrRateCfg = prefs.getUShort("gsrr", GSR_RATE_DEFAULT);
   thoraxRateCfg = prefs.getUShort("thr", THORAX_RATE_DEFAULT);
   abdomenRateCfg = prefs.getUShort("abr", ABDOMEN_RATE_DEFAULT);
-  autoEcgBoost = prefs.getBool("auto", true);
+  autoEcgBoost = prefs.getBool("auto", false);
   gsrVref = prefs.getFloat("vref", GSR_VREF_DEFAULT);
+  streamEcg = prefs.getBool("se", true);
+  streamPpg = prefs.getBool("sp", true);
+  streamTelemetry = prefs.getBool("st", true);
+  streamJson = prefs.getBool("json", false);
+  txUsb = prefs.getBool("usb", true);
+  txBle = prefs.getBool("ble", true);
+  usbEcgStream = prefs.getBool("ue", false);
+  usbPpgStream = prefs.getBool("up", false);
   prefs.end();
 
   if (ecgRateCfg < 20 || ecgRateCfg > ECG_RATE_MAX) ecgRateCfg = ECG_RATE_DEFAULT;
@@ -1215,7 +1357,9 @@ static void defaultsConfig() {
   streamJson = false;
   txUsb = true;
   txBle = true;
-  autoEcgBoost = true;
+  usbEcgStream = usbPpgStream = false;
+  usbBinaryMode = false;
+  autoEcgBoost = false;
   ecgRateCfg = ECG_RATE_DEFAULT;
   ppgRateCfg = PPG_RATE_DEFAULT;
   gsrRateCfg = GSR_RATE_DEFAULT;
@@ -1242,23 +1386,27 @@ static bool parseOnOff(const char *s, bool &dst) {
 
 static void statusText(char *out, size_t n) {
   snprintf(out, n,
-           "STATUS run=%u BLE=%u MTU=%u ECG=%u/%u GSR=%u TH=%u AB=%u PPG=%u TEMP=%u BAT=%u "
-           "stream=%u/%u/%u JSON=%u USB=%u BLEtx=%u "
-           "rates ECGcfg=%u ECGeff=%u PPG=%u GSR=%u TH=%u AB=%u "
-           "q=%u/%u/%u drops=%lu/%lu errors=%lu,%lu,%lu,%lu adcSPS=%lu,%lu,%lu,%lu",
-           (unsigned)runState, (unsigned)bleConnected, (unsigned)negotiatedMtu(),
-           (unsigned)enEcg, (unsigned)ecgRateCfg, (unsigned)enGsr, (unsigned)enThorax,
-           (unsigned)enAbdomen, (unsigned)enPpg, (unsigned)enTemp, (unsigned)enBattery,
-           (unsigned)streamEcg, (unsigned)streamPpg, (unsigned)streamTelemetry,
-           (unsigned)streamJson, (unsigned)txUsb, (unsigned)txBle,
-           (unsigned)ecgRateCfg, (unsigned)effectiveEcgRate(), (unsigned)ppgRateCfg,
-           (unsigned)gsrRateCfg, (unsigned)thoraxRateCfg, (unsigned)abdomenRateCfg,
-           (unsigned)ecgCount(), (unsigned)ppgCount(), (unsigned)telCount(),
-           (unsigned long)ecgDrops, (unsigned long)ppgDrops,
-           (unsigned long)adcErrors[0], (unsigned long)adcErrors[1],
-           (unsigned long)adcErrors[2], (unsigned long)adcErrors[3],
-           (unsigned long)adcSamples[0], (unsigned long)adcSamples[1],
-           (unsigned long)adcSamples[2], (unsigned long)adcSamples[3]);
+    "STATUS run=%u generation=%lu BLE=%u MTU=%u USBmode=%s "
+    "ECG target=%u effective=%u actual=%.1f GSR target=%u actual=%.1f "
+    "TH target=%u actual=%.1f AB target=%u actual=%.1f "
+    "PPG target=%u actual=%.1f q=%u/%u/%u drops=%lu/%lu "
+    "fifo_ovf=%lu sw_ovf=%lu errs=%lu,%lu,%lu,%lu ppg_i2c=%lu temp_i2c=%lu "
+    "frames=%lu/%lu usb_frames=%lu ble_reject=%lu",
+    (unsigned)runState, (unsigned long)sessionGeneration,
+    (unsigned)bleConnected, (unsigned)negotiatedMtu(), usbBinaryMode ? "BINARY" : "TEXT",
+    (unsigned)ecgRateCfg, (unsigned)effectiveEcgRate(), measuredAdcSps[0],
+    (unsigned)gsrRateCfg, measuredAdcSps[1],
+    (unsigned)thoraxRateCfg, measuredAdcSps[2],
+    (unsigned)abdomenRateCfg, measuredAdcSps[3],
+    (unsigned)ppgRateCfg, measuredPpgSps,
+    (unsigned)ecgCount(), (unsigned)ppgCount(), (unsigned)telCount(),
+    (unsigned long)ecgDrops, (unsigned long)ppgDrops,
+    (unsigned long)ppgFifoOverflow, (unsigned long)ppgSoftwareOverflow,
+    (unsigned long)adcErrors[0], (unsigned long)adcErrors[1],
+    (unsigned long)adcErrors[2], (unsigned long)adcErrors[3],
+    (unsigned long)ppgI2cErrors, (unsigned long)tempI2cErrors,
+    (unsigned long)framesGenerated, (unsigned long)framesAccepted,
+    (unsigned long)usbFrames, (unsigned long)bleNotifyRejected);
 }
 
 static void handleCommand(char *cmd) {
@@ -1266,9 +1414,22 @@ static void handleCommand(char *cmd) {
   while (*cmd == ' ' || *cmd == '\t' || *cmd == '\r' || *cmd == '\n') cmd++;
   if (*cmd == '\0') return;
   uppercaseInPlace(cmd);
+  StateGuard guard;
+  if (!guard.held) return;
 
   if (!strcmp(cmd, "HELP")) {
-    sendResponse("OK COMMANDS: START STOP STATUS HELP DEFAULTS SAVE SLEEP; ECG/GSR/THORAX/ABDOMEN/PPG/TEMP/BAT ON|OFF; ECG_STREAM/PPG_STREAM/TELEM_STREAM/JSON/USB_ECG/USB_PPG/USB/BLE ON|OFF; SET ECG_RATE n; SET PPG_RATE 100|200|400; SET GSR_RATE n; SET THORAX_RATE n; SET ABDOMEN_RATE n; SET AUTO_ECG ON|OFF; SET VREF x.xxxx");
+    sendResponse("OK COMMANDS: START STOP STATUS HELP DEFAULTS SAVE SLEEP; ECG/GSR/THORAX/ABDOMEN/PPG/TEMP/BAT ON|OFF; ECG_STREAM/PPG_STREAM/TELEM_STREAM/JSON/USB_ECG/USB_PPG/USB/BLE ON|OFF; USB_MODE TEXT|BINARY; SET ECG_RATE n; SET PPG_RATE 100|200|400; SET GSR_RATE n; SET THORAX_RATE n; SET ABDOMEN_RATE n; SET AUTO_ECG ON|OFF; SET VREF x.xxxx");
+    return;
+  }
+
+  if (!strcmp(cmd, "USB_MODE BINARY")) {
+    sendResponse("OK USB_MODE BINARY");
+    usbBinaryMode = true;
+    return;
+  }
+  if (!strcmp(cmd, "USB_MODE TEXT")) {
+    usbBinaryMode = false;
+    sendResponse("OK USB_MODE TEXT");
     return;
   }
 
@@ -1280,7 +1441,8 @@ static void handleCommand(char *cmd) {
   }
 
   if (!strcmp(cmd, "START")) {
-    runState = STATE_RUNNING;
+    runState = STATE_STOPPED;
+    sessionGeneration++;
     clearBuffers();
     sessionStartMs = nowMs();
     sessionStartUs = (uint64_t)esp_timer_get_time();
@@ -1289,7 +1451,9 @@ static void handleCommand(char *cmd) {
     ppgRrMs = 0;
     hrHistCount = 0;
     memset(hrHist, 0, sizeof(hrHist));
+    ecgSeq = ppgSeq = telSeq = evtSeq = 0;
     adcScheduleDirty = true;
+    runState = STATE_RUNNING;
     sendEvent("START");
     sendResponse("OK START");
     return;
@@ -1297,6 +1461,7 @@ static void handleCommand(char *cmd) {
 
   if (!strcmp(cmd, "STOP")) {
     runState = STATE_STOPPED;
+    sessionGeneration++;
     clearBuffers();
     sendEvent("STOP");
     sendResponse("OK STOP");
@@ -1357,10 +1522,12 @@ static void handleCommand(char *cmd) {
       long x = atol(val);
       if (!strcmp(key, "ECG_RATE")) {
         if (x >= 20 && x <= ECG_RATE_MAX) {
+          uint16_t old = ecgRateCfg;
           ecgRateCfg = (uint16_t)x;
           if (adcTotalBudget() <= ADC_BUDGET_SPS) {
             adcScheduleDirty = true; markConfigDirty(); sendResponse("OK SET ECG_RATE"); return;
           }
+          ecgRateCfg = old;
         }
         sendResponse("ERR ECG_RATE budget/range"); return;
       }
@@ -1372,38 +1539,46 @@ static void handleCommand(char *cmd) {
       }
       if (!strcmp(key, "GSR_RATE")) {
         if (x >= 1 && x <= 100) {
+          uint16_t old = gsrRateCfg;
           gsrRateCfg = (uint16_t)x;
           if (adcTotalBudget() <= ADC_BUDGET_SPS) {
             adcScheduleDirty = true; markConfigDirty(); sendResponse("OK SET GSR_RATE"); return;
           }
+          gsrRateCfg = old;
         }
         sendResponse("ERR GSR_RATE budget/range"); return;
       }
       if (!strcmp(key, "THORAX_RATE")) {
         if (x >= 1 && x <= 100) {
+          uint16_t old = thoraxRateCfg;
           thoraxRateCfg = (uint16_t)x;
           if (adcTotalBudget() <= ADC_BUDGET_SPS) {
             adcScheduleDirty = true; markConfigDirty(); sendResponse("OK SET THORAX_RATE"); return;
           }
+          thoraxRateCfg = old;
         }
         sendResponse("ERR THORAX_RATE budget/range"); return;
       }
       if (!strcmp(key, "ABDOMEN_RATE")) {
         if (x >= 1 && x <= 100) {
+          uint16_t old = abdomenRateCfg;
           abdomenRateCfg = (uint16_t)x;
           if (adcTotalBudget() <= ADC_BUDGET_SPS) {
             adcScheduleDirty = true; markConfigDirty(); sendResponse("OK SET ABDOMEN_RATE"); return;
           }
+          abdomenRateCfg = old;
         }
         sendResponse("ERR ABDOMEN_RATE budget/range"); return;
       }
       if (!strcmp(key, "AUTO_ECG")) {
         bool b = false;
         if (parseOnOff(val, b)) {
+          bool old = autoEcgBoost;
           autoEcgBoost = b;
-          if (adcTotalBudget() <= ADC_BUDGET_SPS || b) {
+          if (adcTotalBudget() <= ADC_BUDGET_SPS) {
             adcScheduleDirty = true; markConfigDirty(); sendResponse("OK SET AUTO_ECG"); return;
           }
+          autoEcgBoost = old;
         }
         sendResponse("ERR AUTO_ECG"); return;
       }
@@ -1442,12 +1617,12 @@ static void processUsbCommands() {
 
 class CmdCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *c) override {
-    std::string v = c->getValue();
-    if (v.empty() || cmdQueue == nullptr) return;
+    String v = c->getValue();
+    if (v.length() == 0 || cmdQueue == nullptr) return;
     CmdMsg msg{};
-    size_t n = v.size();
+    size_t n = v.length();
     if (n >= sizeof(msg.text)) n = sizeof(msg.text) - 1;
-    memcpy(msg.text, v.data(), n);
+    memcpy(msg.text, v.c_str(), n);
     msg.text[n] = '\0';
     if (xQueueSend(cmdQueue, &msg, 0) != pdTRUE) cmdDrops++;
   }
@@ -1466,22 +1641,24 @@ static void processBleCommands() {
 // ----------------------------------------------------------------------
 static void performDeepSleep() {
   if (deepSleeping) return;
-  deepSleeping = true;
-  runState = STATE_STOPPED;
-
-  if (ppgOk) ppgHardware(false);
+  {
+    StateGuard guard;
+    if (!guard.held) return;
+    deepSleeping = true;
+    runState = STATE_STOPPED;
+    sessionGeneration++;
+  }
+  while (!commsParked) vTaskDelay(1);
+  if (!usbBinaryMode && txUsb) printDiagnostics();
   sendEvent("SHUTDOWN");
   vTaskDelay(pdMS_TO_TICKS(20));
 
-  if (adcTaskHandle) vTaskSuspend(adcTaskHandle);
-  if (ppgTaskHandle) vTaskSuspend(ppgTaskHandle);
-  if (slowTaskHandle) vTaskSuspend(slowTaskHandle);
-  if (commsTaskHandle) vTaskSuspend(commsTaskHandle);
-
+  if (ppgOk) ppgHardware(false);
   BLEDevice::deinit(true);
+  int wakeLevel = digitalRead(PIN_SLEEP) == LOW ? 1 : 0;
   rtc_gpio_pullup_en(GPIO_NUM_4);
   rtc_gpio_pulldown_dis(GPIO_NUM_4);
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_4, 1);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_4, wakeLevel);
   esp_deep_sleep_start();
 }
 
@@ -1492,13 +1669,13 @@ static void sleepTask(void *arg) {
     bool low = (digitalRead(PIN_SLEEP) == LOW);
     if (low) {
       if (lowSince == 0) lowSince = nowMs();
-      if ((uint32_t)(nowMs() - lowSince) >= SLEEP_HOLD_MS || sleepRequested) {
+      if ((uint32_t)(nowMs() - lowSince) >= SLEEP_HOLD_MS) {
         performDeepSleep();
       }
     } else {
       lowSince = 0;
-      sleepRequested = false;
     }
+    if (sleepRequested) performDeepSleep();
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
@@ -1509,36 +1686,31 @@ static void sleepTask(void *arg) {
 static void printDiagnostics() {
   static uint32_t lastMs = 0;
   static uint32_t lastCount[4] = {0,0,0,0};
+  static uint32_t lastPpg = 0;
   uint32_t n = nowMs();
-  float sec = (lastMs == 0 || n <= lastMs) ? 1.0f : (float)(n - lastMs) / 1000.0f;
-  uint32_t d0 = adcSamples[0] - lastCount[0];
-  uint32_t d1 = adcSamples[1] - lastCount[1];
-  uint32_t d2 = adcSamples[2] - lastCount[2];
-  uint32_t d3 = adcSamples[3] - lastCount[3];
-
-  Serial.printf("DIAG ADC_SPS=%.1f,%.1f,%.1f,%.1f ECGq=%u PPGq=%u TELq=%u "
-                "ECGpk=%lu PPGpk=%lu drops=%lu/%lu errs=%lu,%lu,%lu,%lu mux=%lu "
-                "BLE=%u MTU=%u reject=%lu\n",
-                d0/sec, d1/sec, d2/sec, d3/sec,
-                (unsigned)ecgCount(), (unsigned)ppgCount(), (unsigned)telCount(),
-                (unsigned long)ecgPackets, (unsigned long)ppgPackets,
-                (unsigned long)ecgDrops, (unsigned long)ppgDrops,
-                (unsigned long)adcErrors[0], (unsigned long)adcErrors[1],
-                (unsigned long)adcErrors[2], (unsigned long)adcErrors[3],
-                (unsigned long)adcMuxChanges,
-                (unsigned)bleConnected, (unsigned)negotiatedMtu(),
-                (unsigned long)bleNotifyRejected);
-
-  lastCount[0] = adcSamples[0];
-  lastCount[1] = adcSamples[1];
-  lastCount[2] = adcSamples[2];
-  lastCount[3] = adcSamples[3];
+  if (lastMs != 0 && n > lastMs) {
+    float sec = (float)(n - lastMs) / 1000.0f;
+    for (uint8_t i = 0; i < 4; ++i)
+      measuredAdcSps[i] = (adcSamples[i] - lastCount[i]) / sec;
+    measuredPpgSps = (ppgSamples - lastPpg) / sec;
+    if (!usbBinaryMode && txUsb) {
+      char line[640];
+      statusText(line, sizeof(line));
+      Serial.printf("DIAG %s\n", line);
+    }
+  }
+  for (uint8_t i = 0; i < 4; ++i) lastCount[i] = adcSamples[i];
+  lastPpg = ppgSamples;
   lastMs = n;
 }
 
 static void commsTask(void *arg) {
   (void)arg;
   for (;;) {
+    if (deepSleeping) {
+      commsParked = true;
+      vTaskSuspend(nullptr);
+    }
     processUsbCommands();
     processBleCommands();
 
@@ -1588,7 +1760,7 @@ static void setupBle() {
     void onDisconnect(BLEServer *s) override {
       (void)s;
       bleConnected = false;
-      BLEDevice::startAdvertising();
+      if (!deepSleeping) BLEDevice::startAdvertising();
     }
   };
   bleServer->setCallbacks(new ServerCb());
@@ -1647,6 +1819,7 @@ static void setupBle() {
 void setup() {
   Serial.begin(115200);
   delay(150);
+  WiFi.mode(WIFI_OFF);
 
   pinMode(PIN_SLEEP, INPUT_PULLUP);
   pinMode(PIN_LOP, INPUT);
@@ -1659,6 +1832,7 @@ void setup() {
   Wire.setClock(400000);
   i2cMutex = xSemaphoreCreateMutex();
   bleMutex = xSemaphoreCreateMutex();
+  stateMutex = xSemaphoreCreateMutex();
   cmdQueue = xQueueCreate(8, sizeof(CmdMsg));
 
   loadConfig();
@@ -1669,6 +1843,7 @@ void setup() {
   else Serial.println("ERR ADS1115 0x49 not found");
 
   ppgOk = probeI2C(PPG_ADDR);
+  if (ppgOk) ppgOk = ppg.begin(Wire, I2C_SPEED_FAST, PPG_ADDR);
   if (ppgOk) Serial.println("OK MAX30102 0x57 present");
   else Serial.println("ERR MAX30102 0x57 not found");
 
@@ -1688,9 +1863,13 @@ void setup() {
   }
 
   if (adcTotalBudget() > ADC_BUDGET_SPS) {
-    Serial.printf("WARN ADS target budget %u > %u; reducing ECG to base target\n",
+    Serial.printf("WARN ADS target budget %u > %u; restoring default rates\n",
                   (unsigned)adcTotalBudget(), (unsigned)ADC_BUDGET_SPS);
+    gsrRateCfg = GSR_RATE_DEFAULT;
+    thoraxRateCfg = THORAX_RATE_DEFAULT;
+    abdomenRateCfg = ABDOMEN_RATE_DEFAULT;
     ecgRateCfg = ECG_RATE_DEFAULT;
+    autoEcgBoost = false;
   }
 
   setupBle();
@@ -1706,7 +1885,7 @@ void setup() {
   xTaskCreatePinnedToCore(commsTask, "COMMS", 8192, nullptr, 3, &commsTaskHandle, 0);
   xTaskCreatePinnedToCore(sleepTask, "SLEEP", 2048, nullptr, 7, &sleepTaskHandle, 0);
 
-  Serial.println("PinaBiosensor V1 engineered firmware READY - WiFi disabled");
+  Serial.println("PinaBiosensor firmware v1.1 for Paca v1.0 READY - WiFi disabled");
   char s[600];
   statusText(s, sizeof(s));
   Serial.println(s);

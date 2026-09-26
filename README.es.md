@@ -6,7 +6,7 @@ El **pedido JLCPCB que ya está pagado** es **v1.0** (`exports/PinaBio_v1_*`). H
 
 **PinaBio** es una placa de **biofeedback** (piel, pulso, temperatura, ECG, respiración). **No es un dispositivo médico** y no diagnostica nada. El apodo **Paca** es un homenaje a la abuela de Alejandro.
 
-En el teléfono, el Bluetooth sigue llamándose **`PinaBiosensor`**. No cambies ese nombre ni el paquete Android `com.pinabiosensor.mini`.
+En el teléfono, el Bluetooth se anuncia como **`PinaBiosensor`**. Conserva este nombre BLE para los clientes del firmware.
 
 ## Qué es la placa
 
@@ -23,7 +23,7 @@ En textos viejos esta misma placa se llama «Completa». Los ficheros KiCad sigu
 Carga el XIAO por su USB-C. **Con electrodos o bandas en la piel: solo Bluetooth. Nunca USB del PC y piel a la vez.**
 
 Especificación de hardware + firmware (para revisión): `docs/11_especificacion_hw_firmware.md`.
-Prompt listo para pegar en ChatGPT: `docs/12_prompt_revision_chatgpt.md`.
+Firmware vigente de la placa fabricada: `firmware/PinaBiosensor_Firmware_v1_1/`.
 PDF de hardware para adjuntar: `docs/PinaBio_v1.0_para_ChatGPT.pdf`.
 
 Los archivos de fabricación están en la rama **`kicad-completa`** (`exports/PinaBio_v1_*.zip` / `.csv`). Una copia en OneDrive puede estar desactualizada.
@@ -54,20 +54,11 @@ Sube estos tres archivos de **`kicad-completa`**:
 
 Sketch de la PCBA pedida (Arduino, XIAO ESP32-S3):
 
-`firmware/PinaBiosensor_V1_Firmware_Final/PinaBiosensor_V1_Firmware_Final.ino`
+`firmware/PinaBiosensor_Firmware_v1_1/PinaBiosensor_Firmware_v1_1.ino`
 
-BLE: `PinaBiosensor`. Protocolo: `docs/13_protocolo_firmware_v1.md`. README del firmware: `firmware/README.md`. Scheduler ADS: `docs/14_ads1115_scheduler_v0.2.md`.
+BLE: `PinaBiosensor`. Protocolo vigente: `docs/13_protocolo_firmware_v1_1.md`. Instrucciones: `firmware/README.md`. Cambios: `firmware/CHANGELOG_v1_1.md`.
 
-El JSON v3 antiguo queda como debug/legado (`docs/05_protocolo_json.md`). Sketch anterior: `firmware/archive/PinaBiosensor_Mini/`.
-
-```bash
-python3 protocol/validate.py
-python3 protocol/hrv_check.py
-```
-
-## App Android
-
-`android/` — escanear, HRV, % batería, **Calibrar respiración**, ECG. En pantalla: **PinaBio**. Hay un ejemplo si no hay BLE.
+El JSON v4 es solo para depuración; el formato principal son los frames binarios del protocolo.
 
 ## Abrir el PCB en KiCad
 
@@ -89,7 +80,7 @@ Lista de diseño: `bom/BOM.csv`.
 
 - `docs/02_arquitectura.md` — arquitectura
 - `docs/04_seguridad.md` — seguridad (EN + ES)
-- `docs/05_protocolo_json.md` — BLE, UUIDs y JSON
+- `docs/13_protocolo_firmware_v1_1.md` — BLE, UUIDs y frames V1.1
 - `docs/08_jlcpcb_order.md` — order (English)
 - `docs/08_pedido_jlcpcb.md` — pedido (español)
 - `docs/09_caja_interruptor_medidor.md` — DPDT de caja (4 hilos) y J10

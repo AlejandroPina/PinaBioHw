@@ -264,4 +264,4 @@ El Bluetooth en el móvil se llama **PinaBiosensor**. En la placa pone PinaBio v
 7. Batería **solo** con protección, en **J1**, polaridad correcta. No USB y piel a la vez **nunca**.
 8. Sesión con piel: **solo Bluetooth**, USB del ordenador **fuera**.
 
-Cuando las placas estén en la mesa, el siguiente paso (firmware y app) es otro documento. Este pedido solo fabrica el hardware de **PinaBio v1.0**.
+Este pedido solo fabrica el hardware de **PinaBio v1.0**. El firmware vigente está documentado aparte en `firmware/`.

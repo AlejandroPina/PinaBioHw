@@ -14,7 +14,7 @@ Autor del proyecto: Alejandro. **No es un dispositivo médico.**
 | Esquemático **de verdad** (símbolos + hilos + etiquetas globales) | Sí, si Grok usa KiCad 8 y las librerías de este repo |
 | PCB colocada, planos GNDA/GNDD, net-tie | Sí |
 | Pistas **sin errores DRC** (listo para JLCPCB) | **A veces no a la primera.** Debe **iterar**: DRC → corregir → DRC hasta 0 errores. No entregar Manhattan sucio y decir “listo” |
-| Firmware / Android | **No los reinventes.** Ya existen. Solo KiCad + Gerbers + BOM si cambia |
+| Firmware | El sketch V1.1 está en `firmware/`; esta guía se centra en KiCad, Gerbers y BOM |
 
 Si no tienes KiCad instalado, **no inventes un `.kicad_pcb` a mano**. Di que falta KiCad. No sustituyas la placa por un dibujo ASCII.
 
@@ -36,7 +36,7 @@ Eres el **layoutista**. El circuito **ya está decidido**. No “mejoras” la a
 4. `scripts/generate_kicad.py` — **fuente eléctrica** (nets y pines)
 5. `hardware/sym-lib/Pina.kicad_sym`
 6. `hardware/footprints.pretty/` (XIAO zócalo, cables 4P y 6P)
-7. `firmware/PinaBiosensor_V1_Firmware_Final/PinaBiosensor_V1_Firmware_Final.ino` — pines de la PCB v1.0 (no contradecir).
+7. `firmware/PinaBiosensor_Firmware_v1_1/PinaBiosensor_Firmware_v1_1.ino` — pines de la PCB v1.0 (no contradecir).
 
 No uses `uploads/PinaBiosensor_Mini_Guia_KiCad_Principiantes_*.md` (está mal: GPIO3, etiquetas jerárquicas, sensores a V_ANALOG).
 
