@@ -1,5 +1,5 @@
 /*
- * PinaBiosensor Firmware v1.1 for fabricated PinaBio Paca v1.0
+ * PinaBiosensor Firmware v1.2 for fabricated PinaBio Paca v1.0
  * Target: Seeed Studio XIAO ESP32-S3
  *
  * Hardware fixed by fabricated V1 PCB:
@@ -22,6 +22,9 @@
  *   This firmware is a testable engineering baseline, not a medical device.
  *   Target sample rates are configurable goals. STATUS/DIAG reports measured
  *   rates so the real PCBA can be characterized without changing code.
+ *
+ * EN: Review guide: docs/firmware_v1_2_code_guide.en.md.
+ * ES: Guía de revisión: docs/firmware_v1_2_code_guide.es.md.
  */
 
 #include <Arduino.h>
@@ -97,7 +100,7 @@ static constexpr uint32_t PPG_POLL_MS           = 3;
 // Header (13 bytes):
 //   0 magic 0xA5
 //   1 type (1=ECG, 2=PPG, 3=TELEMETRY, 4=EVENT)
-//   2 version = 0x11
+//   2 version = 0x12
 //   3 flags
 //   4..5 sequence LE
 //   6..9 first timestamp, microseconds from START modulo 2^32 LE
@@ -106,7 +109,7 @@ static constexpr uint32_t PPG_POLL_MS           = 3;
 // Payload follows. CRC16-CCITT-FALSE is last 2 bytes.
 // ECG sample: int16 raw, LE.
 // PPG sample: uint24 IR + uint24 RED, LE (18-bit source packed into 24 bits).
-static constexpr uint8_t PROTOCOL_VERSION = 0x11; // V1.1; layout V1
+static constexpr uint8_t PROTOCOL_VERSION = 0x12; // V1.2; binary layout retained
 static constexpr uint8_t PACKET_MAGIC     = 0xA5;
 static constexpr uint16_t DEFAULT_ATT_MTU  = 23;
 
@@ -117,6 +120,8 @@ enum AdcChan : uint8_t { CH_ECG = 0, CH_GSR = 1, CH_THORAX = 2, CH_ABDOMEN = 3, 
 
 enum RunState : uint8_t { STATE_STOPPED = 0, STATE_RUNNING = 1 };
 
+// EN: Samples keep absolute 64-bit monotonic time until serialization.
+// ES: Las muestras conservan tiempo monotónico de 64 bits hasta serializar.
 struct ESample {
   int16_t raw;
   uint64_t tsUs; // monotonic microseconds, absolute until serialization
@@ -141,6 +146,7 @@ struct SlowSample {
   uint8_t adsOk;
   uint8_t ppgOk;
   uint8_t tempOk;
+  uint16_t seq; // Assigned when acquired, so dropped snapshots leave wire gaps.
 };
 
 struct CmdMsg {
@@ -151,13 +157,17 @@ enum GainMode : uint8_t { GAINMODE_ONE = 0, GAINMODE_0512 = 1 };
 
 struct AdcSlot {
   uint64_t nextDueUs;
-  AdcChan lastChan;
-  GainMode lastGain;
 };
 
 // ----------------------------------------------------------------------
 // Globals
 // ----------------------------------------------------------------------
+// EN: ADC/PPG/SLOW acquire; COMMS sends. stateMutex protects configuration,
+// session and snapshots; i2cMutex serializes Wire; bleMutex serializes every
+// characteristic setValue/notify. Each ring uses its own portMUX.
+// ES: ADC/PPG/SLOW adquieren y COMMS envía. stateMutex protege sesión y
+// configuración; i2cMutex protege Wire; bleMutex protege notificaciones;
+// cada ring usa su propio portMUX.
 MAX30105 ppg;
 Preferences prefs;
 
@@ -190,20 +200,31 @@ portMUX_TYPE ecgMux = portMUX_INITIALIZER_UNLOCKED;
 portMUX_TYPE ppgMux = portMUX_INITIALIZER_UNLOCKED;
 portMUX_TYPE telMux = portMUX_INITIALIZER_UNLOCKED;
 
+// EN/ES: volatile flags are signals; shared payloads need the mutex.
 volatile bool bleConnected = false;
 volatile bool sleepRequested = false;
 volatile bool deepSleeping = false;
-volatile bool commsParked = false;
+bool commsParked = false; // Accessed under stateMutex.
+bool adcParked = false;  // Written/read only while stateMutex is held.
+bool ppgParked = false;
+bool ppgPowerUnverified = false; // Failed setup must not be mistaken for verified SHDN.
+bool slowParked = false;
+volatile bool sleepAbortPending = false;
+volatile bool sleepFailureLatch = false;
 uint32_t sessionGeneration = 1;
 bool usbBinaryMode = false;
 uint32_t ppgFifoOverflow = 0;
 uint32_t ppgSoftwareOverflow = 0;
 uint8_t ppgOverflowPrev = 0;
 uint32_t ppgI2cErrors = 0;
+uint32_t ppgPowerErrors = 0;
 uint32_t tempI2cErrors = 0;
 uint32_t framesGenerated = 0;
-uint32_t framesAccepted = 0;
+uint32_t framesSubmitted = 0; // API requests, never an application ACK.
 uint32_t usbFrames = 0;
+uint32_t usbShortWrites = 0;
+uint32_t sleepAborts = 0;
+uint32_t telDrops = 0;
 float measuredAdcSps[4] = {0, 0, 0, 0};
 float measuredPpgSps = 0;
 
@@ -272,12 +293,12 @@ uint16_t ppgSeq = 0;
 uint16_t telSeq = 0;
 uint16_t evtSeq = 0;
 
-uint32_t sessionStartMs = 0;
 uint64_t sessionStartUs = 0;
 uint32_t lastTelemetryMs = 0;
 uint32_t lastDiagMs = 0;
 uint32_t configDirtySinceMs = 0;
 bool configDirty = false;
+bool bootEventPending = true; // COMMS alone emits BOOT after task creation.
 
 // ----------------------------------------------------------------------
 // Ring buffers
@@ -511,6 +532,7 @@ static bool telPush(const SlowSample &s) {
   size_t next = (telHead + 1) % TEL_RING_CAP;
   if (next == telTail) {
     telTail = (telTail + 1) % TEL_RING_CAP;
+    telDrops++;
     overwritten = true;
   }
   telRing[telHead] = s;
@@ -519,16 +541,24 @@ static bool telPush(const SlowSample &s) {
   return !overwritten;
 }
 
-static bool telPop(SlowSample &s) {
+static bool telPeek(SlowSample &s) {
   bool ok = false;
   portENTER_CRITICAL(&telMux);
   if (telTail != telHead) {
     s = telRing[telTail];
-    telTail = (telTail + 1) % TEL_RING_CAP;
     ok = true;
   }
   portEXIT_CRITICAL(&telMux);
   return ok;
+}
+
+// The producer may overwrite the oldest telemetry while BLE/USB is sending.
+// Consume only the exact snapshot that was peeked, never its successor.
+static void telDiscardIfSeq(uint16_t seq) {
+  portENTER_CRITICAL(&telMux);
+  if (telTail != telHead && telRing[telTail].seq == seq)
+    telTail = (telTail + 1) % TEL_RING_CAP;
+  portEXIT_CRITICAL(&telMux);
 }
 
 static size_t telCount() {
@@ -642,6 +672,8 @@ static bool probeI2C(uint8_t addr) {
 // ----------------------------------------------------------------------
 static AdcSlot adcSlots[4];
 static volatile bool adcScheduleDirty = true;
+static AdcChan lastAdsChan = CH_NONE; // Actual previous conversion, ADC task only.
+static GainMode lastAdsGain = GAINMODE_ONE;
 
 static void rebuildAdcSchedule() {
   StateGuard guard;
@@ -650,9 +682,8 @@ static void rebuildAdcSchedule() {
   for (uint8_t i = 0; i < 4; ++i) {
     AdcChan c = (AdcChan)i;
     adcSlots[i].nextDueUs = enabled(c) ? t : UINT64_MAX;
-    adcSlots[i].lastChan = CH_NONE;
-    adcSlots[i].lastGain = GAINMODE_ONE;
   }
+  lastAdsChan = CH_NONE;
   adcScheduleDirty = false;
 }
 
@@ -718,6 +749,7 @@ static void adcTask(void *arg) {
       StateGuard guard;
       generation = sessionGeneration;
       active = guard.held && runState == STATE_RUNNING && adsOk && !deepSleeping;
+      if (guard.held) adcParked = !active;
     }
     if (!active) {
       vTaskDelay(pdMS_TO_TICKS(10));
@@ -733,22 +765,25 @@ static void adcTask(void *arg) {
 
     const uint8_t idx = (uint8_t)c;
     const GainMode g = gainFor(c);
-    if (adcSlots[idx].lastChan != c || adcSlots[idx].lastGain != g) {
-      if (adcSlots[idx].lastChan != CH_NONE) adcMuxChanges++;
-      adcSlots[idx].lastChan = c;
-      adcSlots[idx].lastGain = g;
-    }
+    // EN/ES: Compare with the actual prior ADS conversion, not this slot's
+    // previous use; each channel has its own slot.
+    if (lastAdsChan != CH_NONE && (lastAdsChan != c || lastAdsGain != g))
+      adcMuxChanges++;
+    lastAdsChan = c;
+    lastAdsGain = g;
 
     int16_t raw = 0;
     uint64_t ts = 0;
     if (adsStartAndRead(c, raw, ts)) {
       StateGuard guard;
-      if (guard.held && generation == sessionGeneration && runState == STATE_RUNNING && !deepSleeping) {
+      if (guard.held && generation == sessionGeneration && runState == STATE_RUNNING &&
+          enabled(c) && !deepSleeping) {
         adcConversions++;
         processAdcSample(c, raw, ts);
       }
     } else {
-      adcErrors[idx]++;
+      StateGuard guard;
+      if (guard.held && generation == sessionGeneration && !deepSleeping) adcErrors[idx]++;
     }
 
     uint16_t rate;
@@ -796,6 +831,16 @@ static bool max30205Read(float &tempC) {
 // ----------------------------------------------------------------------
 // MAX30102 / PPG
 // ----------------------------------------------------------------------
+// Caller holds i2cMutex. / El llamador tiene i2cMutex.
+static bool ppgRead8Locked(uint8_t reg, uint8_t &value) {
+  Wire.beginTransmission(PPG_ADDR);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0 ||
+      Wire.requestFrom((int)PPG_ADDR, 1, true) != 1) return false;
+  value = (uint8_t)Wire.read();
+  return true;
+}
+
 static bool configurePpg(uint16_t rate) {
   if (!ppgOk) return false;
   if (rate != 100 && rate != 200 && rate != 400) return false;
@@ -807,21 +852,79 @@ static bool configurePpg(uint16_t rate) {
   ppg.setFIFOAverage(1);
   ppg.enableFIFORollover();
   ppg.clearFIFO();
+  while (ppg.available()) ppg.nextSample(); // Drain SparkFun's RAM ring too.
+  // EN/ES: setup() wakes the IC. A rate change while STOPPED must leave it
+  // shut down, including when the PPG task already considers hwOn false.
+  bool stopped = runState == STATE_STOPPED;
+  if (stopped) ppg.shutDown();
+  uint8_t mode = 0;
+  bool verified = ppgRead8Locked(0x09, mode) &&
+                  (((mode & 0x80U) != 0) == stopped);
   ppgOverflowPrev = 0;
   xSemaphoreGive(i2cMutex);
+  if (stopped) ppgParked = false; // Force worker to re-verify shutdown.
+  ppgPowerUnverified = !verified;
+  if (!verified) { ppgPowerErrors++; return false; }
   ppgRateCfg = rate;
   return true;
 }
 
-static void ppgHardware(bool on) {
-  if (!ppgOk || !i2cMutex) return;
-  if (!xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(50))) return;
+// EN: START freezes conversions, clears the physical FIFO, verifies its three
+// pointers, then wakes PPG. This prevents old samples receiving the new time
+// origin and avoids a readback race at 200/400 SPS.
+// ES: START detiene conversiones, limpia y verifica FIFO, luego despierta PPG.
+static bool clearPpgFifoForSession() {
+  if (!ppgOk) return true;
+  if (!i2cMutex || xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+    ppgI2cErrors++;
+    return false;
+  }
+  ppg.shutDown();
+  uint8_t mode = 0;
+  bool ok = ppgRead8Locked(0x09, mode) && (mode & 0x80U) != 0;
+  if (ok) {
+    ppg.clearFIFO();
+    while (ppg.available()) ppg.nextSample(); // No old library-ring samples.
+    Wire.beginTransmission(PPG_ADDR);
+    Wire.write((uint8_t)0x04); // WR_PTR, OVF_COUNTER, RD_PTR.
+    ok = Wire.endTransmission(false) == 0 &&
+         Wire.requestFrom((int)PPG_ADDR, 3, true) == 3;
+    if (ok) {
+      uint8_t wr = (uint8_t)Wire.read();
+      uint8_t ovf = (uint8_t)Wire.read();
+      uint8_t rd = (uint8_t)Wire.read();
+      ok = wr == 0 && ovf == 0 && rd == 0;
+    }
+  }
+  ppg.wakeUp();
+  bool woke = ppgRead8Locked(0x09, mode) && (mode & 0x80U) == 0;
+  xSemaphoreGive(i2cMutex);
+  ppgParked = false; // START or failure invalidates prior park acknowledgement.
+  ok = ok && woke;
+  if (!ok) ppgI2cErrors++;
+  if (ok) ppgOverflowPrev = 0;
+  return ok;
+}
+
+// EN: Verify MODE_CONFIG.SHDN after SparkFun's write. A timeout is not success.
+// ES: Verificamos SHDN tras escribirlo. Un timeout no es un apagado correcto.
+static bool ppgHardware(bool on) {
+  if (!ppgOk || !i2cMutex) return false;
+  if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+    ppgPowerErrors++;
+    return false;
+  }
   if (on) {
     ppg.wakeUp();
   } else {
     ppg.shutDown();
   }
+  uint8_t mode = 0;
+  bool readOk = ppgRead8Locked(0x09, mode); // MODE_CONFIG bit 7 = SHDN.
   xSemaphoreGive(i2cMutex);
+  bool verified = readOk && (((mode & 0x80U) != 0) == !on);
+  if (!verified) ppgPowerErrors++;
+  return verified;
 }
 
 static void processPpgBeat(uint32_t ir, uint32_t sampleTs) {
@@ -850,7 +953,7 @@ static void processPpgBeat(uint32_t ir, uint32_t sampleTs) {
 
 static void ppgTask(void *arg) {
   (void)arg;
-  bool hwOn = false;
+  bool hwOn = ppgOk; // setup() configures and enables the PPG before tasks start.
   uint32_t lastPoll = 0;
 
   for (;;) {
@@ -860,18 +963,24 @@ static void ppgTask(void *arg) {
       StateGuard guard;
       generation = sessionGeneration;
       want = guard.held && runState == STATE_RUNNING && enPpg && ppgOk && !deepSleeping;
+      if (guard.held && want) ppgParked = false;
     }
     if (!want) {
-      if (hwOn) {
-        ppgHardware(false);
-        hwOn = false;
-      }
+      bool mustVerify;
+      { StateGuard guard; mustVerify = guard.held && !ppgParked; }
+      if (ppgOk && (hwOn || mustVerify)) {
+        hwOn = !ppgHardware(false);
+      } else if (!ppgOk) hwOn = false;
+      { StateGuard guard; if (guard.held) ppgParked = !hwOn && !ppgPowerUnverified; }
       vTaskDelay(pdMS_TO_TICKS(10));
       continue;
     }
 
     if (!hwOn) {
-      ppgHardware(true);
+      if (!ppgHardware(true)) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        continue;
+      }
       hwOn = true;
       lastPoll = nowMs();
       vTaskDelay(pdMS_TO_TICKS(5));
@@ -919,7 +1028,8 @@ static void ppgTask(void *arg) {
     }
     xSemaphoreGive(i2cMutex);
     StateGuard guard;
-    if (guard.held && generation == sessionGeneration && runState == STATE_RUNNING && !deepSleeping) {
+    if (guard.held && generation == sessionGeneration && runState == STATE_RUNNING &&
+        enPpg && !deepSleeping) {
       for (uint8_t i = 0; i < batchCount; ++i) {
         ppgPush(batch[i]);
         ppgSamples++;
@@ -946,6 +1056,7 @@ static void slowTask(void *arg) {
       StateGuard guard;
       generation = sessionGeneration;
       active = guard.held && runState == STATE_RUNNING && !deepSleeping;
+      if (guard.held) slowParked = !active;
       wantTemp = enTemp;
       wantBatt = enBattery;
     }
@@ -987,7 +1098,8 @@ static void slowTask(void *arg) {
         lastBattV = newBatt;
         tempOk = newTempOk;
         telPush({clockUs(), lastGsrUs, lastThoraxV, lastAbdomenV, lastTempC, lastBattV,
-                 ppgHr, ppgRrMs, lastLo, (uint8_t)adsOk, (uint8_t)ppgOk, (uint8_t)tempOk});
+                 ppgHr, ppgRrMs, lastLo, (uint8_t)adsOk, (uint8_t)ppgOk,
+                 (uint8_t)tempOk, telSeq++});
       }
     }
     vTaskDelay(pdMS_TO_TICKS(5));
@@ -1009,8 +1121,17 @@ static uint16_t bleValueMax() {
   return (mtu > 3) ? (uint16_t)(mtu - 3) : 20;
 }
 
+// EN: Bluedroid ignores notify without a CCCD subscription. This is still
+// not an application acknowledgement.
+// ES: Sin suscripción CCCD, Bluedroid ignora notify. No es un ACK del móvil.
+static bool bleSubscribed(BLECharacteristic *ch) {
+  if (!ch || !bleConnected || !txBle) return false;
+  BLEDescriptor *desc = ch->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
+  return desc && static_cast<BLE2902 *>(desc)->getNotifications();
+}
+
 static bool bleNotify(BLECharacteristic *ch, const uint8_t *data, size_t len) {
-  if (!txBle || !bleConnected || ch == nullptr) return false;
+  if (!bleSubscribed(ch)) return false;
   uint16_t maxLen = bleValueMax();
   if (len > maxLen) {
     bleNotifyRejected++;
@@ -1020,6 +1141,7 @@ static bool bleNotify(BLECharacteristic *ch, const uint8_t *data, size_t len) {
     bleNotifyRejected++;
     return false;
   }
+  if (!bleSubscribed(ch)) { xSemaphoreGive(bleMutex); return false; }
   ch->setValue((uint8_t *)data, len);
   ch->notify();
   xSemaphoreGive(bleMutex);
@@ -1028,11 +1150,12 @@ static bool bleNotify(BLECharacteristic *ch, const uint8_t *data, size_t len) {
 }
 
 static void bleText(BLECharacteristic *ch, const char *txt) {
-  if (!ch || !bleConnected || !txBle) return;
+  if (!bleSubscribed(ch)) return;
   size_t remaining = strlen(txt);
   uint16_t maxLen = bleValueMax();
   if (maxLen == 0) return;
   if (!bleMutex || xSemaphoreTake(bleMutex, pdMS_TO_TICKS(10)) != pdTRUE) return;
+  if (!bleSubscribed(ch)) { xSemaphoreGive(bleMutex); return; }
   while (remaining) {
     size_t n = remaining < maxLen ? remaining : maxLen;
     ch->setValue((uint8_t *)txt, n);
@@ -1046,6 +1169,17 @@ static void bleText(BLECharacteristic *ch, const char *txt) {
 static void sendResponse(const char *txt) {
   if (txUsb && !usbBinaryMode) Serial.println(txt);
   bleText(chCmd, txt);
+}
+
+// EN: Serial.write may return a short count. Such a frame is unusable to the
+// host; retain queued samples and expose the fault in STATUS.
+// ES: Una escritura corta rompe el frame; conservamos muestras y contamos el
+// fallo para que el host pueda resincronizar por magic y CRC.
+static bool usbWriteFrame(const uint8_t *frame, size_t len) {
+  size_t written = Serial.write(frame, len);
+  if (written != len) { usbShortWrites++; return false; }
+  usbFrames++;
+  return true;
 }
 
 static void sendEvent(const char *txt) {
@@ -1070,19 +1204,21 @@ static void sendEvent(const char *txt) {
   putU16(&frame[len - 2], crc);
   framesGenerated++;
   bool accepted = bleNotify(chEvt, frame, len);
-  if (usbBinaryMode && txUsb && Serial.write(frame, len) == len) { accepted = true; usbFrames++; }
-  if (accepted) { eventPackets++; evtSeq++; framesAccepted++; }
+  if (usbBinaryMode && txUsb && usbWriteFrame(frame, len)) accepted = true;
+  if (accepted) { eventPackets++; evtSeq++; framesSubmitted++; }
 }
 
 // ----------------------------------------------------------------------
 // Frame builders
 // ----------------------------------------------------------------------
 static bool sendEcgFrame() {
-  const bool wantBle = streamEcg && bleConnected && txBle;
+  const bool wantBle = streamEcg && bleSubscribed(chEcg);
   const bool wantUsb = streamEcg && txUsb && usbBinaryMode && usbEcgStream;
   if (!streamEcg || (!wantBle && !wantUsb)) return false;
-  const uint16_t maxLen = wantBle ? bleValueMax() : 252;
-  if (maxLen < 17) return false;
+  // EN/ES: An unusable BLE MTU must not block a valid USB binary stream.
+  const bool canBle = wantBle && bleValueMax() >= 17;
+  if (!canBle && !wantUsb) return false;
+  const uint16_t maxLen = canBle ? bleValueMax() : 252;
 
   uint8_t maxSamples = (uint8_t)((maxLen - 15) / 2); // 13 header + 2 CRC
   if (maxSamples > 80) maxSamples = 80;
@@ -1121,25 +1257,27 @@ static bool sendEcgFrame() {
   uint16_t crc = crc16ccitt(frame, len - 2);
   putU16(&frame[len - 2], crc);
   framesGenerated++;
-  bool delivered = false;
-  if (wantBle) delivered = bleNotify(chEcg, frame, len) || delivered;
+  bool submitted = false;
+  if (canBle) submitted = bleNotify(chEcg, frame, len) || submitted;
   if (wantUsb) {
-    if (Serial.write(frame, len) == len) { delivered = true; usbFrames++; }
+    if (usbWriteFrame(frame, len)) submitted = true;
   }
-  if (!delivered) return false;
+  if (!submitted) return false;
   ecgDiscard(maxSamples);
   ecgSeq++;
-  framesAccepted++;
+  framesSubmitted++;
   ecgPackets++;
   return true;
 }
 
 static bool sendPpgFrame() {
-  const bool wantBle = streamPpg && bleConnected && txBle;
+  const bool wantBle = streamPpg && bleSubscribed(chPpg);
   const bool wantUsb = streamPpg && txUsb && usbBinaryMode && usbPpgStream;
   if (!streamPpg || (!wantBle && !wantUsb)) return false;
-  const uint16_t maxLen = wantBle ? bleValueMax() : 252;
-  if (maxLen < 21) return false;
+  // EN/ES: BLE below MTU 24 cannot carry one PPG sample; USB remains usable.
+  const bool canBle = wantBle && bleValueMax() >= 21;
+  if (!canBle && !wantUsb) return false;
+  const uint16_t maxLen = canBle ? bleValueMax() : 252;
 
   uint8_t maxSamples = (uint8_t)((maxLen - 15) / 6); // 13 header + 2 CRC
   if (maxSamples > 30) maxSamples = 30;
@@ -1178,15 +1316,15 @@ static bool sendPpgFrame() {
   uint16_t crc = crc16ccitt(frame, len - 2);
   putU16(&frame[len - 2], crc);
   framesGenerated++;
-  bool delivered = false;
-  if (wantBle) delivered = bleNotify(chPpg, frame, len) || delivered;
+  bool submitted = false;
+  if (canBle) submitted = bleNotify(chPpg, frame, len) || submitted;
   if (wantUsb) {
-    if (Serial.write(frame, len) == len) { delivered = true; usbFrames++; }
+    if (usbWriteFrame(frame, len)) submitted = true;
   }
-  if (!delivered) return false;
+  if (!submitted) return false;
   ppgDiscard(maxSamples);
   ppgSeq++;
-  framesAccepted++;
+  framesSubmitted++;
   ppgPackets++;
   return true;
 }
@@ -1195,7 +1333,7 @@ static bool sendTelemetryFrame(const SlowSample &s) {
   if (!streamTelemetry) return false;
   const size_t payloadLen = 24;
   const size_t len = 13 + payloadLen + 2;
-  const bool wantBle = bleConnected && txBle && bleValueMax() >= len;
+  const bool wantBle = bleSubscribed(chTel) && bleValueMax() >= len;
   const bool wantUsb = txUsb && usbBinaryMode;
   if (!wantBle && !wantUsb) return false;
 
@@ -1204,7 +1342,7 @@ static bool sendTelemetryFrame(const SlowSample &s) {
   frame[1] = 3;
   frame[2] = PROTOCOL_VERSION;
   frame[3] = 0;
-  putU16(&frame[4], telSeq);
+  putU16(&frame[4], s.seq);
   putU32(&frame[6], wireTime(s.tsUs));
   putU16(&frame[10], 0);
   frame[12] = 0;
@@ -1223,10 +1361,13 @@ static bool sendTelemetryFrame(const SlowSample &s) {
   if (s.adsOk) flags |= 1U;
   if (s.ppgOk) flags |= 2U;
   if (s.tempOk) flags |= 4U;
-  if (enEcg) flags |= 8U;
-  if (enGsr) flags |= 16U;
-  if (enThorax) flags |= 32U;
-  if (enAbdomen) flags |= 64U;
+  {
+    StateGuard guard;
+    if (guard.held && enEcg) flags |= 8U;
+    if (guard.held && enGsr) flags |= 16U;
+    if (guard.held && enThorax) flags |= 32U;
+    if (guard.held && enAbdomen) flags |= 64U;
+  }
   if (s.lo) flags |= 128U;
   putU16(p, flags); p += 2;
   putU16(p, (uint16_t)((ecgCount() > 65535U) ? 65535U : ecgCount())); p += 2;
@@ -1237,10 +1378,9 @@ static bool sendTelemetryFrame(const SlowSample &s) {
   putU16(&frame[len - 2], crc);
   framesGenerated++;
   bool accepted = wantBle && bleNotify(chTel, frame, len);
-  if (wantUsb && Serial.write(frame, len) == len) { accepted = true; usbFrames++; }
+  if (wantUsb && usbWriteFrame(frame, len)) accepted = true;
   if (!accepted) return false;
-  telSeq++;
-  framesAccepted++;
+  framesSubmitted++;
   telPackets++;
   return true;
 }
@@ -1289,36 +1429,41 @@ static void markConfigDirty() {
   configDirtySinceMs = nowMs();
 }
 
-static void saveConfig() {
-  prefs.begin("pinabio", false);
-  prefs.putBool("ecg", enEcg);
-  prefs.putBool("gsr", enGsr);
-  prefs.putBool("thorax", enThorax);
-  prefs.putBool("abd", enAbdomen);
-  prefs.putBool("ppg", enPpg);
-  prefs.putBool("temp", enTemp);
-  prefs.putBool("bat", enBattery);
-  prefs.putUShort("ecgr", ecgRateCfg);
-  prefs.putUShort("ppgr", ppgRateCfg);
-  prefs.putUShort("gsrr", gsrRateCfg);
-  prefs.putUShort("thr", thoraxRateCfg);
-  prefs.putUShort("abr", abdomenRateCfg);
-  prefs.putBool("auto", autoEcgBoost);
-  prefs.putFloat("vref", gsrVref);
-  prefs.putBool("se", streamEcg);
-  prefs.putBool("sp", streamPpg);
-  prefs.putBool("st", streamTelemetry);
-  prefs.putBool("json", streamJson);
-  prefs.putBool("usb", txUsb);
-  prefs.putBool("ble", txBle);
-  prefs.putBool("ue", usbEcgStream);
-  prefs.putBool("up", usbPpgStream);
+// EN/ES: Preferences::put* returns the number of bytes actually stored.
+// Keep configDirty set if any write fails; the next autosave may retry.
+static bool saveConfig() {
+  if (!prefs.begin("pinabio", false)) return false;
+  bool ok = true;
+  ok &= prefs.putBool("ecg", enEcg) == 1;
+  ok &= prefs.putBool("gsr", enGsr) == 1;
+  ok &= prefs.putBool("thorax", enThorax) == 1;
+  ok &= prefs.putBool("abd", enAbdomen) == 1;
+  ok &= prefs.putBool("ppg", enPpg) == 1;
+  ok &= prefs.putBool("temp", enTemp) == 1;
+  ok &= prefs.putBool("bat", enBattery) == 1;
+  ok &= prefs.putUShort("ecgr", ecgRateCfg) == 2;
+  ok &= prefs.putUShort("ppgr", ppgRateCfg) == 2;
+  ok &= prefs.putUShort("gsrr", gsrRateCfg) == 2;
+  ok &= prefs.putUShort("thr", thoraxRateCfg) == 2;
+  ok &= prefs.putUShort("abr", abdomenRateCfg) == 2;
+  ok &= prefs.putBool("auto", autoEcgBoost) == 1;
+  ok &= prefs.putFloat("vref", gsrVref) == sizeof(float);
+  ok &= prefs.putBool("se", streamEcg) == 1;
+  ok &= prefs.putBool("sp", streamPpg) == 1;
+  ok &= prefs.putBool("st", streamTelemetry) == 1;
+  ok &= prefs.putBool("json", streamJson) == 1;
+  ok &= prefs.putBool("usb", txUsb) == 1;
+  ok &= prefs.putBool("ble", txBle) == 1;
+  ok &= prefs.putBool("ue", usbEcgStream) == 1;
+  ok &= prefs.putBool("up", usbPpgStream) == 1;
   prefs.end();
-  configDirty = false;
+  if (ok) configDirty = false;
+  else configDirtySinceMs = nowMs();
+  return ok;
 }
 
 static void loadConfig() {
-  prefs.begin("pinabio", true);
+  if (!prefs.begin("pinabio", true)) return; // Globals retain safe defaults.
   enEcg = prefs.getBool("ecg", true);
   enGsr = prefs.getBool("gsr", true);
   enThorax = prefs.getBool("thorax", true);
@@ -1391,7 +1536,10 @@ static void statusText(char *out, size_t n) {
     "TH target=%u actual=%.1f AB target=%u actual=%.1f "
     "PPG target=%u actual=%.1f q=%u/%u/%u drops=%lu/%lu "
     "fifo_ovf=%lu sw_ovf=%lu errs=%lu,%lu,%lu,%lu ppg_i2c=%lu temp_i2c=%lu "
-    "frames=%lu/%lu usb_frames=%lu ble_reject=%lu",
+    "frames_generated=%lu frames_submitted=%lu usb_frames=%lu ble_notify_calls=%lu ble_reject=%lu "
+    "health=%u/%u/%u tel_drops=%lu ppg_power_err=%lu usb_short=%lu sleep_abort=%lu "
+    "packets=%lu/%lu/%lu/%lu cmd_drops=%lu adc_conv=%lu mux_changes=%lu "
+    "stack_hwm=%lu/%lu/%lu/%lu/%lu",
     (unsigned)runState, (unsigned long)sessionGeneration,
     (unsigned)bleConnected, (unsigned)negotiatedMtu(), usbBinaryMode ? "BINARY" : "TEXT",
     (unsigned)ecgRateCfg, (unsigned)effectiveEcgRate(), measuredAdcSps[0],
@@ -1405,8 +1553,21 @@ static void statusText(char *out, size_t n) {
     (unsigned long)adcErrors[0], (unsigned long)adcErrors[1],
     (unsigned long)adcErrors[2], (unsigned long)adcErrors[3],
     (unsigned long)ppgI2cErrors, (unsigned long)tempI2cErrors,
-    (unsigned long)framesGenerated, (unsigned long)framesAccepted,
-    (unsigned long)usbFrames, (unsigned long)bleNotifyRejected);
+    (unsigned long)framesGenerated, (unsigned long)framesSubmitted,
+    (unsigned long)usbFrames, (unsigned long)bleNotifyAttempts,
+    (unsigned long)bleNotifyRejected,
+    (unsigned)adsOk, (unsigned)ppgOk, (unsigned)tempOk,
+    (unsigned long)telDrops, (unsigned long)ppgPowerErrors,
+    (unsigned long)usbShortWrites, (unsigned long)sleepAborts,
+    (unsigned long)ecgPackets, (unsigned long)ppgPackets,
+    (unsigned long)telPackets, (unsigned long)eventPackets,
+    (unsigned long)cmdDrops, (unsigned long)adcConversions,
+    (unsigned long)adcMuxChanges,
+    (unsigned long)(adcTaskHandle ? uxTaskGetStackHighWaterMark(adcTaskHandle) : 0),
+    (unsigned long)(ppgTaskHandle ? uxTaskGetStackHighWaterMark(ppgTaskHandle) : 0),
+    (unsigned long)(slowTaskHandle ? uxTaskGetStackHighWaterMark(slowTaskHandle) : 0),
+    (unsigned long)(commsTaskHandle ? uxTaskGetStackHighWaterMark(commsTaskHandle) : 0),
+    (unsigned long)(sleepTaskHandle ? uxTaskGetStackHighWaterMark(sleepTaskHandle) : 0));
 }
 
 static void handleCommand(char *cmd) {
@@ -1434,7 +1595,7 @@ static void handleCommand(char *cmd) {
   }
 
   if (!strcmp(cmd, "STATUS")) {
-    char s[600];
+    char s[1024];
     statusText(s, sizeof(s));
     sendResponse(s);
     return;
@@ -1444,7 +1605,10 @@ static void handleCommand(char *cmd) {
     runState = STATE_STOPPED;
     sessionGeneration++;
     clearBuffers();
-    sessionStartMs = nowMs();
+    if (!clearPpgFifoForSession()) {
+      sendResponse("ERR START_PPG_FIFO");
+      return;
+    }
     sessionStartUs = (uint64_t)esp_timer_get_time();
     lastBeatTsMs = 0;
     ppgHr = 0;
@@ -1469,12 +1633,20 @@ static void handleCommand(char *cmd) {
   }
 
   if (!strcmp(cmd, "SAVE")) {
-    saveConfig();
-    sendResponse("OK SAVE");
+    sendResponse(saveConfig() ? "OK SAVE" : "ERR SAVE_NVS");
     return;
   }
 
   if (!strcmp(cmd, "DEFAULTS")) {
+    if (runState != STATE_STOPPED) {
+      sendResponse("ERR STOP_REQUIRED");
+      return;
+    }
+    // EN/ES: Restore the physical PPG rate as well as its config variable.
+    if (ppgOk && !configurePpg(PPG_RATE_DEFAULT)) {
+      sendResponse("ERR DEFAULTS_PPG");
+      return;
+    }
     defaultsConfig();
     sendResponse("OK DEFAULTS");
     return;
@@ -1532,7 +1704,18 @@ static void handleCommand(char *cmd) {
         sendResponse("ERR ECG_RATE budget/range"); return;
       }
       if (!strcmp(key, "PPG_RATE")) {
+        if (runState != STATE_STOPPED) {
+          sendResponse("ERR STOP_REQUIRED"); return;
+        }
         if ((x == 100 || x == 200 || x == 400) && configurePpg((uint16_t)x)) {
+          // EN/ES: The FIFO was cleared; reject an in-flight old-rate batch.
+          sessionGeneration++;
+          portENTER_CRITICAL(&ppgMux);
+          ppgHead = ppgTail = 0;
+          portEXIT_CRITICAL(&ppgMux);
+          ppgHr = ppgRrMs = 0;
+          lastBeatTsMs = 0;
+          hrHistCount = 0;
           markConfigDirty(); sendResponse("OK SET PPG_RATE"); return;
         }
         sendResponse("ERR PPG_RATE"); return;
@@ -1617,7 +1800,8 @@ static void processUsbCommands() {
 
 class CmdCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *c) override {
-    String v = c->getValue();
+    // Both Arduino-ESP32 2.x (std::string) and 3.x (String) expose length/c_str.
+    auto v = c->getValue();
     if (v.length() == 0 || cmdQueue == nullptr) return;
     CmdMsg msg{};
     size_t n = v.length();
@@ -1641,19 +1825,46 @@ static void processBleCommands() {
 // ----------------------------------------------------------------------
 static void performDeepSleep() {
   if (deepSleeping) return;
+  RunState previousState;
   {
     StateGuard guard;
     if (!guard.held) return;
+    previousState = runState;
     deepSleeping = true;
     runState = STATE_STOPPED;
     sessionGeneration++;
   }
-  while (!commsParked) vTaskDelay(1);
-  if (!usbBinaryMode && txUsb) printDiagnostics();
+  // EN: Each worker acknowledges quiescence only after leaving I2C and, for
+  // PPG, after a verified SHDN. Never enter deep sleep on a timeout.
+  // ES: Cada tarea confirma reposo tras salir de I2C; PPG confirma SHDN.
+  const uint32_t begun = nowMs();
+  bool parked = false;
+  while ((uint32_t)(nowMs() - begun) < 2000U) {
+    { StateGuard guard;
+      parked = guard.held && adcParked && ppgParked && slowParked && commsParked;
+    }
+    if (parked) break;
+    vTaskDelay(pdMS_TO_TICKS(5));
+  }
+  if (!parked) {
+    { StateGuard guard;
+      if (guard.held) {
+        deepSleeping = false;
+        runState = previousState;
+        sessionGeneration++;
+        adcScheduleDirty = true;
+      }
+    }
+    sleepRequested = false;
+    sleepFailureLatch = true;
+    sleepAbortPending = true;
+    sleepAborts++;
+    return;
+  }
   sendEvent("SHUTDOWN");
   vTaskDelay(pdMS_TO_TICKS(20));
 
-  if (ppgOk) ppgHardware(false);
+  // The PPG worker has already verified MODE_CONFIG.SHDN before parking.
   BLEDevice::deinit(true);
   int wakeLevel = digitalRead(PIN_SLEEP) == LOW ? 1 : 0;
   rtc_gpio_pullup_en(GPIO_NUM_4);
@@ -1669,13 +1880,12 @@ static void sleepTask(void *arg) {
     bool low = (digitalRead(PIN_SLEEP) == LOW);
     if (low) {
       if (lowSince == 0) lowSince = nowMs();
-      if ((uint32_t)(nowMs() - lowSince) >= SLEEP_HOLD_MS) {
-        performDeepSleep();
-      }
     } else {
       lowSince = 0;
+      sleepFailureLatch = false;
     }
-    if (sleepRequested) performDeepSleep();
+    if (sleepRequested || (low && !sleepFailureLatch &&
+        (uint32_t)(nowMs() - lowSince) >= SLEEP_HOLD_MS)) performDeepSleep();
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
@@ -1694,7 +1904,7 @@ static void printDiagnostics() {
       measuredAdcSps[i] = (adcSamples[i] - lastCount[i]) / sec;
     measuredPpgSps = (ppgSamples - lastPpg) / sec;
     if (!usbBinaryMode && txUsb) {
-      char line[640];
+      char line[1100];
       statusText(line, sizeof(line));
       Serial.printf("DIAG %s\n", line);
     }
@@ -1708,8 +1918,18 @@ static void commsTask(void *arg) {
   (void)arg;
   for (;;) {
     if (deepSleeping) {
-      commsParked = true;
-      vTaskSuspend(nullptr);
+      { StateGuard guard; if (guard.held) commsParked = true; }
+      // EN/ES: Cooperative park avoids a resume-before-suspend race on abort.
+      while (deepSleeping) vTaskDelay(pdMS_TO_TICKS(5));
+      { StateGuard guard; if (guard.held) commsParked = false; }
+    }
+    if (sleepAbortPending) {
+      sleepAbortPending = false;
+      sendResponse("ERR SLEEP_NOT_QUIESCENT");
+    }
+    if (bootEventPending) {
+      bootEventPending = false;
+      sendEvent("BOOT");
     }
     processUsbCommands();
     processBleCommands();
@@ -1718,8 +1938,8 @@ static void commsTask(void *arg) {
     if ((uint32_t)(n - lastTelemetryMs) >= TELEMETRY_PERIOD_MS) {
       lastTelemetryMs = n;
       SlowSample s;
-      if (telPop(s)) {
-        sendTelemetryFrame(s);
+      if (telPeek(s) && sendTelemetryFrame(s)) {
+        telDiscardIfSeq(s.seq);
       }
       sendLegacyJson();
       notifyHr();
@@ -1834,6 +2054,10 @@ void setup() {
   bleMutex = xSemaphoreCreateMutex();
   stateMutex = xSemaphoreCreateMutex();
   cmdQueue = xQueueCreate(8, sizeof(CmdMsg));
+  if (!i2cMutex || !bleMutex || !stateMutex || !cmdQueue) {
+    Serial.println("FATAL FreeRTOS synchronization allocation");
+    for (;;) delay(1000);
+  }
 
   loadConfig();
 
@@ -1874,22 +2098,26 @@ void setup() {
 
   setupBle();
 
-  sessionStartMs = nowMs();
   sessionStartUs = (uint64_t)esp_timer_get_time();
   lastTelemetryMs = nowMs();
   lastDiagMs = nowMs();
 
-  xTaskCreatePinnedToCore(adcTask, "ADC", 8192, nullptr, 6, &adcTaskHandle, 1);
-  xTaskCreatePinnedToCore(ppgTask, "PPG", 8192, nullptr, 5, &ppgTaskHandle, 1);
-  xTaskCreatePinnedToCore(slowTask, "SLOW", 4096, nullptr, 2, &slowTaskHandle, 0);
-  xTaskCreatePinnedToCore(commsTask, "COMMS", 8192, nullptr, 3, &commsTaskHandle, 0);
-  xTaskCreatePinnedToCore(sleepTask, "SLEEP", 2048, nullptr, 7, &sleepTaskHandle, 0);
+  bool tasksOk = true;
+  tasksOk &= xTaskCreatePinnedToCore(adcTask, "ADC", 8192, nullptr, 6, &adcTaskHandle, 1) == pdPASS;
+  tasksOk &= xTaskCreatePinnedToCore(ppgTask, "PPG", 8192, nullptr, 5, &ppgTaskHandle, 1) == pdPASS;
+  tasksOk &= xTaskCreatePinnedToCore(slowTask, "SLOW", 4096, nullptr, 2, &slowTaskHandle, 0) == pdPASS;
+  tasksOk &= xTaskCreatePinnedToCore(commsTask, "COMMS", 8192, nullptr, 3, &commsTaskHandle, 0) == pdPASS;
+  tasksOk &= xTaskCreatePinnedToCore(sleepTask, "SLEEP", 4096, nullptr, 7, &sleepTaskHandle, 0) == pdPASS;
+  if (!tasksOk) {
+    Serial.println("FATAL FreeRTOS task allocation; firmware not READY");
+    { StateGuard guard; if (guard.held) runState = STATE_STOPPED; }
+    for (;;) delay(1000);
+  }
 
-  Serial.println("PinaBiosensor firmware v1.1 for Paca v1.0 READY - WiFi disabled");
-  char s[600];
+  Serial.println("PinaBiosensor firmware v1.2 for Paca v1.0 READY - WiFi disabled");
+  char s[1024];
   statusText(s, sizeof(s));
   Serial.println(s);
-  sendEvent("BOOT");
 }
 
 void loop() {

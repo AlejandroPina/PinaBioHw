@@ -23,7 +23,7 @@ En textos viejos esta misma placa se llama «Completa». Los ficheros KiCad sigu
 Carga el XIAO por su USB-C. **Con electrodos o bandas en la piel: solo Bluetooth. Nunca USB del PC y piel a la vez.**
 
 Especificación de hardware + firmware (para revisión): `docs/11_especificacion_hw_firmware.md`.
-Firmware vigente de la placa fabricada: `firmware/PinaBiosensor_Firmware_v1_1/`.
+Firmware vigente de la placa fabricada: `firmware/PinaBiosensor_Firmware_v1_2/`.
 PDF de hardware para adjuntar: `docs/PinaBio_v1.0_para_ChatGPT.pdf`.
 
 Los archivos de fabricación están en la rama **`kicad-completa`** (`exports/PinaBio_v1_*.zip` / `.csv`). Una copia en OneDrive puede estar desactualizada.
@@ -54,9 +54,9 @@ Sube estos tres archivos de **`kicad-completa`**:
 
 Sketch de la PCBA pedida (Arduino, XIAO ESP32-S3):
 
-`firmware/PinaBiosensor_Firmware_v1_1/PinaBiosensor_Firmware_v1_1.ino`
+`firmware/PinaBiosensor_Firmware_v1_2/PinaBiosensor_Firmware_v1_2.ino`
 
-BLE: `PinaBiosensor`. Protocolo vigente: `docs/13_protocolo_firmware_v1_1.md`. Instrucciones: `firmware/README.md`. Cambios: `firmware/CHANGELOG_v1_1.md`.
+BLE: `PinaBiosensor`. Protocolo vigente: `docs/firmware_v1_2_protocol.es.md`. Instrucciones: `firmware/README.md`. Cambios: `firmware/CHANGELOG_v1_2.md`.
 
 El JSON v4 es solo para depuración; el formato principal son los frames binarios del protocolo.
 
@@ -80,7 +80,7 @@ Lista de diseño: `bom/BOM.csv`.
 
 - `docs/02_arquitectura.md` — arquitectura
 - `docs/04_seguridad.md` — seguridad (EN + ES)
-- `docs/13_protocolo_firmware_v1_1.md` — BLE, UUIDs y frames V1.1
+- `docs/firmware_v1_2_protocol.es.md` — BLE, UUIDs y frames V1.2
 - `docs/08_jlcpcb_order.md` — order (English)
 - `docs/08_pedido_jlcpcb.md` — pedido (español)
 - `docs/09_caja_interruptor_medidor.md` — DPDT de caja (4 hilos) y J10

@@ -52,9 +52,9 @@ Do **not** use the Mini gerbers in `exports/gerbers/PinaBiosensor_Mini-...`.
 
 Board sketch (Arduino, XIAO ESP32-S3):
 
-`firmware/PinaBiosensor_Firmware_v1_1/PinaBiosensor_Firmware_v1_1.ino`
+`firmware/PinaBiosensor_Firmware_v1_2/PinaBiosensor_Firmware_v1_2.ino`
 
-BLE name: `PinaBiosensor`. Current protocol: `docs/13_protocolo_firmware_v1_1.md`. Instructions: `firmware/README.md`. Changes: `firmware/CHANGELOG_v1_1.md`.
+BLE name: `PinaBiosensor`. Current protocol: `docs/firmware_v1_2_protocol.en.md`. Instructions: `firmware/README.md`. Changes: `firmware/CHANGELOG_v1_2.md`.
 
 Firmware debug JSON is v4. Binary frame details are in the protocol specification.
 
@@ -78,7 +78,7 @@ Design BOM: `bom/BOM.csv`.
 
 - `docs/02_arquitectura.md` — architecture
 - `docs/04_seguridad.md` — safety (EN + ES)
-- `docs/13_protocolo_firmware_v1_1.md` — BLE UUIDs and V1.1 frames
+- `docs/firmware_v1_2_protocol.en.md` — BLE UUIDs and V1.2 frames
 - `docs/08_jlcpcb_order.md` — order (English)
 - `docs/08_pedido_jlcpcb.md` — pedido (español)
 - `docs/09_caja_interruptor_medidor.md` — box DPDT (4 wires) and J10

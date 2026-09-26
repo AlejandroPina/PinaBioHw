@@ -8,11 +8,11 @@
 | Nombre BLE (no cambiar) | `PinaBiosensor` |
 | Ficheros KiCad | `hardware/PinaBiosensor_Mini.*` (el nombre Mini es histórico) |
 | Congelado de pedido | `hardware/archive/PinaBio_v1.0/` y `exports/PinaBio_v1_*` |
-| Firmware | `firmware/PinaBiosensor_Firmware_v1_1/PinaBiosensor_Firmware_v1_1.ino`. Protocolo: `docs/13_protocolo_firmware_v1_1.md` |
+| Firmware | `firmware/PinaBiosensor_Firmware_v1_2/PinaBiosensor_Firmware_v1_2.ino`. Protocolo: `docs/firmware_v1_2_protocol.es.md` |
 | Pedido fábrica | 5 PCB + 2 PCBA, verde, 1,6 mm, 2 capas, HASL, vias tented |
 | Clasificación | Prototipo de **biofeedback / laboratorio personal**. **No es dispositivo médico.** No diagnostica. No cumple IEC 60601. |
 
-**Supuestos de este texto (no se preguntó al usuario):** idioma español; base = **v1.0 soldada**, no el layout RF v1.1; firmware = V1.1 del repo; BOM “pedido real” = lo que JLCPCB emparejó en DFM (puede diferir 0,1 % vs 1 % en R3/R4 respecto al CSV del repo).
+**Supuestos de este texto (no se preguntó al usuario):** idioma español; base = **v1.0 soldada**, no el layout RF v1.1; firmware = V1.2 del repo; BOM “pedido real” = lo que JLCPCB emparejó en DFM (puede diferir 0,1 % vs 1 % en R3/R4 respecto al CSV del repo).
 
 ---
 
@@ -282,9 +282,9 @@ GNDA y GNDD unidos en NT1: un ESD en J3 recorre el net-tie hacia el XIAO. Mejor 
 
 ---
 
-## 13. Firmware vigente — V1.1 para la PCB fabricada
+## 13. Firmware vigente — V1.2 para la PCB fabricada
 
-El sketch vigente es `firmware/PinaBiosensor_Firmware_v1_1/PinaBiosensor_Firmware_v1_1.ino`. El formato de frames, comandos y UUID se define en `docs/13_protocolo_firmware_v1_1.md`; las instrucciones y límites de verificación están en `firmware/README.md`. La adquisición utiliza un único task para ADS1115, otro para PPG, otro para telemetría lenta y uno para comunicaciones. No se usa hardware V2.
+El sketch vigente es `firmware/PinaBiosensor_Firmware_v1_2/PinaBiosensor_Firmware_v1_2.ino`. El formato de frames, comandos y UUID se define en `docs/firmware_v1_2_protocol.es.md`; las instrucciones y límites de verificación están en `firmware/README.md`. La adquisición utiliza un único task para ADS1115, otro para PPG, otro para telemetría lenta y uno para comunicaciones. No se usa hardware V2.
 
 El firmware conserva `PinaBiosensor`, ECG y PPG RAW, telemetría, eventos y HRS. JSON v4 es solo depuración.
 
@@ -374,7 +374,7 @@ Esto es lo que un revisor debe atacar. Varios fallos son **nuestros**, no del us
 - ADDR ADS a VDD (0x49) vs temp 0x48.
 - TVS en los tres bornes de piel/goma (aunque no baste).
 - DPDT que **no** corta carga si se cablea como §3.
-- Protocolo binario V1.1 + 0x180D.
+- Protocolo binario V1.2 (0x12) + 0x180D.
 - Contorno 110×70 real en Gerber de producción.
 
 ---
@@ -385,7 +385,7 @@ No incluye:
 
 - Pasos KiCad para Grok (mover XIAO, keepout U.FL, re-anclar conectores). Eso es el **siguiente** encargo, con esta spec como contrato.
 - Esquemático dibujado (está en `hardware/archive/PinaBio_v1.0/PinaBiosensor_Mini.kicad_sch`).
-- Los clientes BLE externos deberán interpretar el protocolo V1.1.
+- Los clientes BLE externos deberán interpretar el protocolo V1.2.
 
 ---
 
