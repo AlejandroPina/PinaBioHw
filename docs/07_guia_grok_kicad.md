@@ -24,7 +24,7 @@ Si no tienes KiCad instalado, **no inventes un `.kicad_pcb` a mano**. Di que fal
 
 Eres el **layoutista**. El circuito **ya está decidido**. No “mejoras” la arquitectura (no cambies pines de sleep, no pongas cargador extra, no alimentes I2C desde V_ANALOG, no uses GPIO3 para el interruptor).
 
-**Olvida la Mini como producto.** El diseño se llama **PinaBio v1.0**. Los archivos KiCad siguen `PinaBiosensor_Mini.*` (**no los renombres**). Gerbers de pedido: `exports/PinaBio_v1_gerbers.zip` (hay copia `PinaBiosensor_Completa_gerbers.zip`). No dejes dos placas distintas.
+**Olvida la Mini como producto.** El diseño se llama **PinaBio v1.0**. Los archivos KiCad siguen `PinaBiosensor_Mini.*` (**no los renombres**). El ZIP original del pedido está restaurado como `exports/PinaBio_v1_gerbers.zip` en `main`; su hash coincide con `exports/archive_v1.0/SHA256SUMS`. No lo sustituyas por los gerbers sueltos de `exports/gerbers/`.
 
 ---
 
@@ -36,7 +36,7 @@ Eres el **layoutista**. El circuito **ya está decidido**. No “mejoras” la a
 4. `scripts/generate_kicad.py` — **fuente eléctrica** (nets y pines)
 5. `hardware/sym-lib/Pina.kicad_sym`
 6. `hardware/footprints.pretty/` (XIAO zócalo, cables 4P y 6P)
-7. `firmware/PinaBiosensor_Firmware_v1_2/PinaBiosensor_Firmware_v1_2.ino` — pines de la PCB v1.0 (no contradecir).
+7. `firmware/PinaBiosensor_Firmware_v1_3/PinaBiosensor_Firmware_v1_3.ino` — firmware vigente y pines de la PCB v1.0 (no contradecir). V1.2 se conserva para rollback.
 
 No uses `uploads/PinaBiosensor_Mini_Guia_KiCad_Principiantes_*.md` (está mal: GPIO3, etiquetas jerárquicas, sensores a V_ANALOG).
 

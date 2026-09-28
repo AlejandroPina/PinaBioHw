@@ -1,0 +1,4 @@
+# Preserve the paid v1.0 manufacturing trio byte-for-byte on every OS.
+exports/PinaBio_v1_gerbers.zip -text
+exports/PinaBio_v1_bom_jlc.csv -text
+exports/PinaBio_v1_cpl.csv -text

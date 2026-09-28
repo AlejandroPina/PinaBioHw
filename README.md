@@ -24,7 +24,7 @@ Older notes call this same board “Completa”. KiCad files stay named `PinaBio
 
 Charge the XIAO from its USB-C. **With electrodes or bands on skin: Bluetooth only. Never USB from a PC and skin at the same time.**
 
-Fabrication files live on branch **`kicad-completa`** (`exports/PinaBio_v1_*.zip` / `.csv`). A copy on OneDrive may be old.
+The paid v1.0 fabrication trio is in `exports/` on `main`: `PinaBio_v1_gerbers.zip`, `PinaBio_v1_bom_jlc.csv` and `PinaBio_v1_cpl.csv`. Their committed bytes match `exports/archive_v1.0/SHA256SUMS`. See the [order guide](docs/08_jlcpcb_order.md) before a repeat order.
 
 ## Safety (read this)
 
@@ -40,13 +40,7 @@ This design is **not** USB-isolated. Full text: `docs/04_seguridad.md`.
 
 **5** bare boards, **2** assembled (PCBA). Step-by-step: [English order guide](docs/08_jlcpcb_order.md) · [Español](docs/08_pedido_jlcpcb.md).
 
-Upload these three files from **`kicad-completa`**:
-
-- `exports/PinaBio_v1_gerbers.zip`
-- `exports/PinaBio_v1_bom_jlc.csv`
-- `exports/PinaBio_v1_cpl.csv`
-
-Do **not** use the Mini gerbers in `exports/gerbers/PinaBiosensor_Mini-...`.
+For a repeat order, use the three `PinaBio_v1_*` files in `exports/` on `main` and verify their hashes against `exports/archive_v1.0/SHA256SUMS`. The old `kicad-completa` branch is no longer needed. Do **not** substitute the loose `exports/gerbers/` files or the v1.1 package.
 
 ## Firmware
 

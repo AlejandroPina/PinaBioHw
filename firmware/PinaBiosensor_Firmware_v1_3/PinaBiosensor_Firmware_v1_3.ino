@@ -869,27 +869,37 @@ static bool applyPpgHardwareRateLocked(uint16_t rate, bool stopped) {
   // EN/ES: setup() wakes the IC. STOPPED must leave SHDN set.
   if (stopped) ppg.shutDown();
   uint8_t mode = 0;
-  return ppgRead8Locked(0x09, mode) && (((mode & 0x80U) != 0) == stopped);
+  uint8_t spo2Config = 0;
+  const uint8_t expectedRateBits = (rate == 100) ? 1U : (rate == 200) ? 2U : 3U;
+  // EN: SHDN alone cannot prove the selected sample rate. Read back SR[2:0]
+  // in SPO2_CONFIG (0x0A, bits 4:2) before accepting an apply or rollback.
+  // ES: SHDN no demuestra la tasa. Verificamos SR[2:0] en 0x0A, bits 4:2.
+  return ppgRead8Locked(0x09, mode) &&
+         ppgRead8Locked(0x0A, spo2Config) &&
+         (((mode & 0x80U) != 0) == stopped) &&
+         (((spo2Config >> 2) & 0x07U) == expectedRateBits);
 }
 
-static bool configurePpg(uint16_t rate, bool stopped) {
-  if (!ppgOk) return false;
-  if (rate != 100 && rate != 200 && rate != 400) return false;
-  if (!i2cMutex || !xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(50))) return false;
-  uint16_t previous = ppgRateCfg;
-  bool verified = applyPpgHardwareRateLocked(rate, stopped);
-  if (!verified && previous != rate &&
-      (previous == 100 || previous == 200 || previous == 400)) {
-    // EN: Roll the chip back so software rate and FIFO clock stay matched.
-    // ES: Revertimos el chip para que la tasa en software coincida con el FIFO.
-    applyPpgHardwareRateLocked(previous, stopped);
+enum PpgConfigResult : uint8_t { PPG_APPLIED, PPG_UNCHANGED, PPG_UNVERIFIED };
+
+// EN: Only touches the I2C device. The caller owns stateMutex for the
+// previous-rate snapshot and later commits ppgRateCfg/health under that lock.
+// ES: Solo toca I2C. El llamador toma la tasa previa y publica el resultado
+// bajo stateMutex; nunca se adquiere stateMutex mientras se posee i2cMutex.
+static PpgConfigResult configurePpgHardware(uint16_t rate, uint16_t previous,
+                                            bool stopped) {
+  if (rate != 100 && rate != 200 && rate != 400) return PPG_UNCHANGED;
+  if (!i2cMutex || xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(50)) != pdTRUE)
+    return PPG_UNCHANGED; // No register was changed.
+  bool applied = applyPpgHardwareRateLocked(rate, stopped);
+  bool restored = false;
+  if (!applied && (previous == 100 || previous == 200 || previous == 400)) {
+    // EN/ES: A failed readback is not a successful rollback; verify again.
+    restored = applyPpgHardwareRateLocked(previous, stopped);
   }
   ppgOverflowPrev = 0;
   xSemaphoreGive(i2cMutex);
-  ppgPowerUnverified = !verified;
-  if (!verified) { ppgPowerErrors++; return false; }
-  ppgRateCfg = rate;
-  return true;
+  return applied ? PPG_APPLIED : restored ? PPG_UNCHANGED : PPG_UNVERIFIED;
 }
 
 // EN: START freezes conversions, clears the physical FIFO, verifies its three
@@ -922,7 +932,7 @@ static bool clearPpgFifoForSession() {
   ppg.wakeUp();
   bool woke = ppgRead8Locked(0x09, mode) && (mode & 0x80U) == 0;
   xSemaphoreGive(i2cMutex);
-  ppgParked = false; // START or failure invalidates prior park acknowledgement.
+  // EN/ES: The command caller invalidates ppgParked under stateMutex.
   ok = ok && woke;
   if (!ok) ppgI2cErrors++;
   if (ok) ppgOverflowPrev = 0;
@@ -1640,6 +1650,10 @@ static void handleCommand(char *cmd) {
   }
 
   if (!strcmp(cmd, "START")) {
+    if (ppgPowerUnverified) {
+      sendResponse("ERR PPG_CONFIG_UNVERIFIED");
+      return;
+    }
     runState = STATE_STOPPED;
     sessionGeneration++;
     clearBuffers();
@@ -1652,6 +1666,10 @@ static void handleCommand(char *cmd) {
       return;
     }
     ppgParked = false;
+    if (deepSleeping) {
+      sendResponse("ERR SLEEP_IN_PROGRESS");
+      return;
+    }
     if (!fifoOk) {
       sendResponse("ERR START_PPG_FIFO");
       return;
@@ -1686,18 +1704,25 @@ static void handleCommand(char *cmd) {
       sendResponse("ERR STOP_REQUIRED");
       return;
     }
+    const bool hadPpg = ppgOk;
+    const uint16_t previousPpgRate = ppgRateCfg;
     dropStateGuard(guard);
-    bool ppgOkCfg = true;
-    if (ppgOk) ppgOkCfg = configurePpg(PPG_RATE_DEFAULT, true);
+    PpgConfigResult result = PPG_APPLIED;
+    if (hadPpg) result = configurePpgHardware(PPG_RATE_DEFAULT, previousPpgRate, true);
     StateGuard g2;
     if (!g2.held) {
       sendResponse("ERR DEFAULTS_LOCK");
       return;
     }
-    if (ppgOk && !ppgOkCfg) {
+    if (hadPpg && result != PPG_APPLIED) {
+      ppgPowerErrors++;
+      ppgPowerUnverified = result == PPG_UNVERIFIED;
+      if (ppgPowerUnverified) ppgOk = false;
+      ppgParked = false;
       sendResponse("ERR DEFAULTS_PPG");
       return;
     }
+    if (hadPpg) ppgPowerUnverified = false;
     ppgParked = false;
     defaultsConfig();
     sendResponse("OK DEFAULTS");
@@ -1762,11 +1787,21 @@ static void handleCommand(char *cmd) {
         if (!(x == 100 || x == 200 || x == 400)) {
           sendResponse("ERR PPG_RATE"); return;
         }
+        if (!ppgOk) { sendResponse("ERR PPG_UNAVAILABLE"); return; }
+        const uint16_t previousPpgRate = ppgRateCfg;
         dropStateGuard(guard);
-        bool ok = configurePpg((uint16_t)x, true);
+        PpgConfigResult result = configurePpgHardware((uint16_t)x, previousPpgRate, true);
         StateGuard g2;
         if (!g2.held) { sendResponse("ERR PPG_RATE_LOCK"); return; }
-        if (!ok) { sendResponse("ERR PPG_RATE"); return; }
+        if (result != PPG_APPLIED) {
+          ppgPowerErrors++;
+          ppgPowerUnverified = result == PPG_UNVERIFIED;
+          if (ppgPowerUnverified) ppgOk = false;
+          ppgParked = false;
+          sendResponse("ERR PPG_RATE"); return;
+        }
+        ppgRateCfg = (uint16_t)x;
+        ppgPowerUnverified = false;
         ppgParked = false;
         sessionGeneration++;
         portENTER_CRITICAL(&ppgMux);
@@ -2138,7 +2173,8 @@ void setup() {
   Serial.println(tempOk ? "OK MAX30205 0x48 present" : "ERR MAX30205 0x48 not found");
 
   if (ppgOk) {
-    if (!configurePpg(ppgRateCfg, false)) {
+    if (configurePpgHardware(ppgRateCfg, ppgRateCfg, false) != PPG_APPLIED) {
+      ppgPowerUnverified = true; // Boot cannot assume shutdown after failed setup.
       ppgOk = false;
       Serial.println("ERR MAX30102 configuration");
     }

@@ -6,9 +6,9 @@ Fuente: `firmware/PinaBiosensor_Firmware_v1_3/PinaBiosensor_Firmware_v1_3.ino`. 
 
 1. `adsStartAndRead`: espera `ADS_860_SETTLE_US` y sondea OS a 50 µs. Sin `vTaskDelay(1)` en esa espera.
 2. `dropStateGuard`: START / `SET PPG_RATE` / `DEFAULTS` sueltan `stateMutex` durante I²C largo.
-3. `configurePpg(rate, stopped)` restaura la tasa anterior en el chip si falla la verificación; `ppgRateCfg` solo cambia si hay éxito.
+3. `configurePpgHardware(rate, previous, stopped)` lee la tasa en `SPO2_CONFIG` y SHDN en `MODE_CONFIG`. Si falla, intenta restaurar `previous` y verifica la restauración. Solo `PPG_APPLIED` cambia `ppgRateCfg`. `PPG_UNVERIFIED` deja PPG no disponible y bloquea START/deep sleep hasta reiniciar con configuración correcta; `PPG_UNCHANGED` mantiene la tasa anterior.
 4. `clearBeatPreview()` en START, STOP y cambio de tasa PPG.
-5. `ppgTask` copia `ppgRateCfg` bajo mutex **antes** de I²C.
+5. `ppgTask` copia `ppgRateCfg` bajo mutex **antes** de I²C. Los comandos capturan `previous`, hacen I²C sin `stateMutex` y publican `ppgRateCfg`, `ppgParked`, `ppgPowerUnverified` y `ppgOk` con otro `StateGuard`. El helper FIFO no escribe `ppgParked` fuera del mutex.
 6. Autosave NVS con `StateGuard`.
 7. `STATUS` incluye `fw=1.3 proto=0x12`.
 

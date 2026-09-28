@@ -12,7 +12,9 @@ Full frame layout, UUIDs, CRC, MTU rules, commands and sleep behaviour: [`firmwa
 - `STATUS` / `DIAG` prefix fields: `fw=1.3 proto=0x12` then the 1.2 fields.
 - `STOP` clears the MCU beat preview (HR/RR become 0). Binary telemetry after STOP is not produced because acquisition is stopped.
 - `ERR START_LOCK`, `ERR DEFAULTS_LOCK`, `ERR PPG_RATE_LOCK` if `stateMutex` cannot be retaken after I²C. Rare.
-- `SET PPG_RATE` / `DEFAULTS` still require `STOP`. A failed PPG reconfigure leaves the previous hardware rate.
+- `ERR SLEEP_IN_PROGRESS` when sleep starts during the unlocked part of `START`; acquisition remains stopped.
+- `ERR PPG_CONFIG_UNVERIFIED` blocks `START` after an unverified PPG configuration or rollback. `ERR PPG_UNAVAILABLE` rejects a rate change when PPG is unavailable.
+- `SET PPG_RATE` / `DEFAULTS` still require `STOP`. On failure, a verified rollback retains the previous hardware rate. If rollback also cannot be verified, PPG becomes unavailable until reboot and successful setup.
 
 There is **no** `CONFIRM_SKIN_SESSION` and **no** `ERR USB_SKIN_INTERLOCK`. This PCB cannot sense USB VBUS. Skin sessions: battery + BLE. Charge (including power bank) and flash with electrodes off.
 

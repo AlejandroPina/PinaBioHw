@@ -27,7 +27,7 @@ Firmware vigente de la placa fabricada: `firmware/PinaBiosensor_Firmware_v1_3/`.
 El 1.2 se conserva en `firmware/PinaBiosensor_Firmware_v1_2/`.
 PDF de hardware para adjuntar: `docs/PinaBio_v1.0_para_ChatGPT.pdf`.
 
-Los archivos de fabricación están en la rama **`kicad-completa`** (`exports/PinaBio_v1_*.zip` / `.csv`). Una copia en OneDrive puede estar desactualizada.
+Los tres archivos del pedido v1.0 están en `exports/` de `main`: `PinaBio_v1_gerbers.zip`, `PinaBio_v1_bom_jlc.csv` y `PinaBio_v1_cpl.csv`. Sus bytes guardados en Git coinciden con `exports/archive_v1.0/SHA256SUMS`. Consulta la [guía de pedido](docs/08_pedido_jlcpcb.md) antes de repetirlo.
 
 ## Seguridad (léelo)
 
@@ -43,13 +43,7 @@ El diseño **no** está aislado de USB. Texto completo: `docs/04_seguridad.md`.
 
 **5** placas, **2** ensambladas (PCBA). Guía: [pedido en español](docs/08_pedido_jlcpcb.md) · [English](docs/08_jlcpcb_order.md).
 
-Sube estos tres archivos de **`kicad-completa`**:
-
-- `exports/PinaBio_v1_gerbers.zip`
-- `exports/PinaBio_v1_bom_jlc.csv`
-- `exports/PinaBio_v1_cpl.csv`
-
-**No** uses los gerbers Mini de `exports/gerbers/PinaBiosensor_Mini-...`.
+Para repetir el pedido, usa los tres ficheros `PinaBio_v1_*` de `exports/` en `main` y verifica sus hashes con `exports/archive_v1.0/SHA256SUMS`. La rama antigua `kicad-completa` ya no hace falta. **No** los sustituyas por los gerbers sueltos de `exports/gerbers/` ni por el paquete v1.1.
 
 ## Firmware
 

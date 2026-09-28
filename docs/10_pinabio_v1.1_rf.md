@@ -21,7 +21,7 @@ Apodo **Paca** igual. Bluetooth del tel√©fono: **`PinaBiosensor`**. Circuito el√
 - `exports/PinaBio_v1.1_bom_jlc.csv`
 - `exports/PinaBio_v1.1_cpl.csv`
 
-## Archivos del pedido v1.0 (no tocar)
+## Archivos del pedido v1.0 (restaurados en `main`; comprobar SHA-256)
 
 - `exports/PinaBio_v1_gerbers.zip`
 - `exports/PinaBio_v1_bom_jlc.csv`

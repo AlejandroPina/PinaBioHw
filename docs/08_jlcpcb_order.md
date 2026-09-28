@@ -2,6 +2,8 @@
 
 # JLCPCB order — PinaBio v1.0 (Paca)
 
+> **Verified archive restored on `main` (2026-09-28).** The three `exports/PinaBio_v1_*` files match the SHA-256 values in `exports/archive_v1.0/SHA256SUMS`, including the original gerber ZIP. Check those hashes before a repeat order; do not substitute `exports/gerbers/` or v1.1 files.
+
 For: **Alejandro**. You do not need KiCad. Do not open or edit the fab files.
 
 Product: **PinaBio v1.0** (nickname **Paca**, after Alejandro’s grandmother). On the phone, Bluetooth is still **`PinaBiosensor`** (do not change it).
@@ -10,7 +12,7 @@ A **v1.1** board (XIAO USB at the edge) exists for a **future** order only. For 
 
 This is **not** a medical device. With electrodes or bands on skin: **Bluetooth only**. **Never** PC USB and skin at the same time.
 
-Fabrication files live on branch **`kicad-completa`**. A OneDrive copy may be stale.
+The former `kicad-completa` branch is absent from the current GitHub remote. The verified order files are now directly under `exports/` on `main`.
 
 ---
 
@@ -35,11 +37,13 @@ You need **exactly 3 files** (names as of September 2026):
 | Parts list for the factory | `PinaBio_v1_bom_jlc.csv` | `exports/PinaBio_v1_bom_jlc.csv` |
 | Where each part sits | `PinaBio_v1_cpl.csv` | `exports/PinaBio_v1_cpl.csv` |
 
-Identical copies still exist under the old “Completa” names. Prefer **`PinaBio_v1_*`**. If you already started a quote with Completa files, keep that same trio — do not mix.
+The original notes also used “Completa” names for copies. Use the `PinaBio_v1_*` trio on `main`, whose hashes match the archived manifest; do not mix packages.
 
 **Do not** upload `exports/gerbers/` files named `PinaBiosensor_Mini-...`. That is a **different** (Mini) board.
 
-These three files are **not** on `main`. Open **`kicad-completa`**, then `exports`. Copy the three `PinaBio_v1_*` files to Desktop or Downloads.
+The original gerber ZIP is now on `main`, alongside its BOM/CPL. The `kicad-completa` branch is no longer needed. Verify all three against `exports/archive_v1.0/SHA256SUMS` before uploading for paid order `SMT026091261919` or a repeat order.
+
+The verified ZIP contains Gerber entries with the historical `PinaBiosensor_Mini-` prefix. Identify this package by the **outer ZIP hash**, not those internal names; the loose `exports/gerbers/` files have not been verified as this paid-order ZIP.
 
 - Do not unzip `PinaBio_v1_gerbers.zip` to “fix” anything. Upload the **whole ZIP**.
 - Do not save the CSVs from Excel if it wants to convert numbers or commas.

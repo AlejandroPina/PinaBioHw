@@ -1,6 +1,6 @@
 # PinaBio v1.0 (Paca) — especificación de hardware y firmware
 
-**Documento para revisión externa (p. ej. Claude).** Describe la placa **tal como se pidió a JLCPCB** (pedido `SMT026091261919`), el firmware del repo, y una crítica de lo que está mal o a medias. No es un manual de usuario.
+**Documento histórico de revisión externa (p. ej. Claude).** Describe la placa **tal como se pidió a JLCPCB** (pedido `SMT026091261919`) y analiza el firmware V1.2. El firmware vigente es [V1.3](../firmware/PinaBiosensor_Firmware_v1_3/PinaBiosensor_Firmware_v1_3.ino), con su [protocolo](firmware_v1_3_protocol.es.md) y [guía de cambios](firmware_v1_3_code_guide.es.md). No es un manual de usuario.
 
 | Campo | Valor |
 |--------|--------|
@@ -8,11 +8,11 @@
 | Nombre BLE (no cambiar) | `PinaBiosensor` |
 | Ficheros KiCad | `hardware/PinaBiosensor_Mini.*` (el nombre Mini es histórico) |
 | Congelado de pedido | `hardware/archive/PinaBio_v1.0/` y `exports/PinaBio_v1_*` |
-| Firmware | `firmware/PinaBiosensor_Firmware_v1_2/PinaBiosensor_Firmware_v1_2.ino`. Protocolo: `docs/firmware_v1_2_protocol.es.md` |
+| Firmware analizado aquí | V1.2 (conservado para rollback). Vigente: `firmware/PinaBiosensor_Firmware_v1_3/PinaBiosensor_Firmware_v1_3.ino` |
 | Pedido fábrica | 5 PCB + 2 PCBA, verde, 1,6 mm, 2 capas, HASL, vias tented |
 | Clasificación | Prototipo de **biofeedback / laboratorio personal**. **No es dispositivo médico.** No diagnostica. No cumple IEC 60601. |
 
-**Supuestos de este texto (no se preguntó al usuario):** idioma español; base = **v1.0 soldada**, no el layout RF v1.1; firmware = V1.2 del repo; BOM “pedido real” = lo que JLCPCB emparejó en DFM (puede diferir 0,1 % vs 1 % en R3/R4 respecto al CSV del repo).
+**Supuestos de esta revisión histórica (no se preguntó al usuario):** idioma español; base = **v1.0 soldada**, no el layout RF v1.1; firmware analizado = V1.2; BOM “pedido real” = lo que JLCPCB emparejó en DFM (puede diferir 0,1 % vs 1 % en R3/R4 respecto al CSV del repo).
 
 ---
 
@@ -282,9 +282,9 @@ GNDA y GNDD unidos en NT1: un ESD en J3 recorre el net-tie hacia el XIAO. Mejor 
 
 ---
 
-## 13. Firmware vigente — V1.2 para la PCB fabricada
+## 13. Firmware analizado — V1.2 para la PCB fabricada
 
-El sketch vigente es `firmware/PinaBiosensor_Firmware_v1_2/PinaBiosensor_Firmware_v1_2.ino`. El formato de frames, comandos y UUID se define en `docs/firmware_v1_2_protocol.es.md`; las instrucciones y límites de verificación están en `firmware/README.md`. La adquisición utiliza un único task para ADS1115, otro para PPG, otro para telemetría lenta y uno para comunicaciones. No se usa hardware V2.
+El sketch que se analizó en esta sección es `firmware/PinaBiosensor_Firmware_v1_2/PinaBiosensor_Firmware_v1_2.ino`. Su formato de frames, comandos y UUID se define en `docs/firmware_v1_2_protocol.es.md`. El sketch vigente V1.3 se describe en `firmware/README.es.md` y `docs/firmware_v1_3_protocol.es.md`. La arquitectura usa una tarea para ADS1115, otra para PPG, otra para telemetría lenta y una para comunicaciones. No se usa hardware V2.
 
 El firmware conserva `PinaBiosensor`, ECG y PPG RAW, telemetría, eventos y HRS. JSON v4 es solo depuración.
 

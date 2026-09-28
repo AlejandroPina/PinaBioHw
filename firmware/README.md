@@ -1,6 +1,6 @@
 # Firmware PinaBiosensor 1.3 — fabricated Paca v1.0
 
-[Español](README.es.md) · [Protocol 1.3](../docs/firmware_v1_3_protocol.en.md) · [Code guide 1.3](../docs/firmware_v1_3_code_guide.en.md) · [Changelog 1.3](CHANGELOG_v1_3.md)
+[Español](README.es.md) · [Protocol 1.3](../docs/firmware_v1_3_protocol.en.md) · [Code guide 1.3](../docs/firmware_v1_3_code_guide.en.md) · [Verification](../docs/firmware_v1_3_verification.md) · [Changelog 1.3](CHANGELOG_v1_3.md)
 
 **Current sketch:** `PinaBiosensor_Firmware_v1_3/PinaBiosensor_Firmware_v1_3.ino`
 

@@ -12,7 +12,9 @@ Layout de frames, UUID, CRC, MTU, comandos y sleep: [`firmware_v1_2_protocol.es.
 - `STATUS` / `DIAG` empiezan con `fw=1.3 proto=0x12` y siguen los campos de 1.2.
 - `STOP` pone a cero la vista previa de pulso del MCU.
 - `ERR START_LOCK`, `ERR DEFAULTS_LOCK`, `ERR PPG_RATE_LOCK` si no se puede recuperar `stateMutex` tras I²C. Raro.
-- `SET PPG_RATE` / `DEFAULTS` siguen exigiendo `STOP`. Si falla el PPG, el chip queda en la tasa anterior.
+- `ERR SLEEP_IN_PROGRESS` si empieza sleep durante la parte desbloqueada de `START`; la adquisición queda parada.
+- `ERR PPG_CONFIG_UNVERIFIED` bloquea `START` tras configuración o reversión PPG no verificadas. `ERR PPG_UNAVAILABLE` rechaza un cambio de tasa si PPG no está disponible.
+- `SET PPG_RATE` / `DEFAULTS` siguen exigiendo `STOP`. Un rollback verificado conserva la tasa previa. Si tampoco se puede verificar, PPG queda no disponible hasta reiniciar y configurar correctamente.
 
 **No** hay `CONFIRM_SKIN_SESSION` ni `ERR USB_SKIN_INTERLOCK`. Esta PCB no siente VBUS. Sesión con piel: batería + BLE. Cargar (también con power bank) y flashear con electrodos fuera.
 

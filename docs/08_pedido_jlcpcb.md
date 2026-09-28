@@ -2,13 +2,15 @@
 
 # Guía de pedido JLCPCB — PinaBio v1.0 (Paca)
 
+> **Archivo verificado restaurado en `main` (28-09-2026).** Los tres ficheros `exports/PinaBio_v1_*`, incluido el ZIP original de gerbers, coinciden en SHA-256 con `exports/archive_v1.0/SHA256SUMS`. Comprueba esos hashes antes de repetir el pedido; no los sustituyas por `exports/gerbers/` ni por v1.1.
+
 Para: **Alejandro**. No hace falta KiCad. No abras ni edites los archivos de fabricación.
 
 Producto: **PinaBio v1.0** (apodo **Paca**, homenaje a la abuela de Alejandro). En el teléfono, el Bluetooth sigue llamándose **`PinaBiosensor`** (no lo cambies).
 
 Hay una placa **v1.1** (USB del XIAO al borde) para **un pedido más adelante**. Para **este** pedido usa **`PinaBio_v1_*`**, no `PinaBio_v1.1_*`. Ver `docs/10_pinabio_v1.1_rf.md`.
 
-Los archivos de fabricación están en la rama **`kicad-completa`**. Una copia en OneDrive puede estar desactualizada.
+La antigua rama `kicad-completa` no existe en el remoto GitHub actual. Los archivos verificados del pedido están ahora directamente en `exports/` de `main`.
 
 ---
 
@@ -47,11 +49,13 @@ Usa preferiblemente los de **PinaBio_v1_***. Si ya empezaste un presupuesto con 
 
 ### Aviso importante: carpeta / rama equivocada
 
-Estos tres archivos **no están** en la versión principal (`main`) del proyecto. En `main` solo hay gerbers sueltos de la Mini.
+Los tres archivos exactos del pedido v1.0 están ahora en `exports/` de `main`. Sus hashes coinciden con `exports/archive_v1.0/SHA256SUMS`.
 
-Tienes que abrir la versión **`kicad-completa`**. Si en Cursor solo ves `main`, **no vas a encontrar** `PinaBio_v1_gerbers.zip`.
+La rama **`kicad-completa`** ya no está disponible, pero el paquete exacto del pedido `SMT026091261919` está restaurado en `main`. Comprueba los hashes antes de continuar.
 
-### Si tienes Cursor en el PC y la carpeta del proyecto abierta
+Dentro del ZIP verificado, los archivos Gerber conservan el prefijo histórico `PinaBiosensor_Mini-`. Identifica el paquete por el **hash del ZIP exterior**, no por esos nombres internos; los archivos sueltos de `exports/gerbers/` no se han verificado como el ZIP del pedido pagado.
+
+### Si tienes el proyecto abierto en el PC
 
 1. En el Explorador de Windows (o en el árbol de archivos de Cursor, a la izquierda), entra en la carpeta del proyecto.
 2. Abre **`exports`**.
@@ -60,23 +64,9 @@ Tienes que abrir la versión **`kicad-completa`**. Si en Cursor solo ves `main`,
    - `PinaBio_v1_bom_jlc.csv`
    - `PinaBio_v1_cpl.csv`
 
-### Si usas el navegador: cursor.com/codebase
+### Si usas GitHub en el navegador
 
-1. Abre el navegador y entra en **https://cursor.com/codebase**.
-2. Abre el proyecto **PinaBioHw** (el nombre puede verse como PinaBio / PinaBioHw).
-3. Arriba o a un lado, si ves un selector de versión/rama, elige **`kicad-completa`**. Si no aparece y solo ves `main`, **para**: esa vista no tiene el ZIP bueno.
-4. Entra en la carpeta **`exports`**.
-5. Descarga los tres archivos de la tabla. En Cursor web suele haber un botón de **descargar** al pulsar el archivo o al pasar el ratón (icono de flecha hacia abajo). Guárdalos en **Descargas**.
-6. Si ves un botón **Download** / **Descargar** de todo el proyecto, úsalo, descomprime el ZIP grande en el PC, y luego entra en `exports\` y saca los tres archivos.
-
-### Si estás en Origin (la web del código)
-
-Si ves un botón **Download** o **Download ZIP**:
-
-1. Asegúrate de estar viendo **`kicad-completa`**, no `main`.
-2. Pulsa **Download** / **Download ZIP**.
-3. Descomprime el archivo en el PC (clic derecho → Extraer todo).
-4. Entra en `exports\` y copia los tres archivos `PinaBio_v1_*`.
+Abre la rama `main`, entra en `exports/` y descarga los tres archivos `PinaBio_v1_*` de la tabla. No descargues `exports/gerbers/`. Compara los SHA-256 con `exports/archive_v1.0/SHA256SUMS` antes de subirlos a JLCPCB.
 
 ### Lo que no debes hacer
 
@@ -105,7 +95,7 @@ Idioma: arriba suele haber un selector. Puedes dejarlo en inglés; abajo se indi
 
 **Lista de comprobación en el visor (antes de seguir):**
 
-- Tamaño aproximado **110 × 70 mm** (11 cm × 7 cm). Si pone 50×30 o similar, **has subido la Mini**: cancela y sube `PinaBio_v1_gerbers.zip` de `kicad-completa`.
+- Tamaño aproximado **110 × 70 mm** (11 cm × 7 cm). Si pone 50×30 o similar, **has subido la Mini**: cancela y usa el `PinaBio_v1_gerbers.zip` verificado de `main`.
 - En la seda (texto blanco) debe verse **J9** (interruptor de caja, 4 pines) y **J10** (medidor de batería, 2 pines).
 - **No debe haber SW1** (no hay interruptor deslizante en la placa). El interruptor va en la **caja**, cableado a J9.
 - Forma rectangular, 4 agujeros de tornillo en las esquinas.

@@ -1,5 +1,7 @@
 # Entrega — PinaBio v1.0 (adaptación caja)
 
+> **Paquete del pedido restaurado en `main` (28-09-2026).** `exports/PinaBio_v1_gerbers.zip`, BOM y CPL coinciden con los SHA-256 de `exports/archive_v1.0/SHA256SUMS`. Comprueba los hashes antes de repetir el pedido. No usar `exports/gerbers/` como sustituto.
+
 Producto: **PinaBio v1.0**. Gerbers para pedir: `exports/PinaBio_v1_gerbers.zip` (copia byte a byte de `PinaBiosensor_Completa_gerbers.zip`; no se regeneró cobre).
 
 Fecha: 2026-09-12  
